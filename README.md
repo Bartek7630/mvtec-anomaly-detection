@@ -95,10 +95,8 @@ Tested with Python 3.10+, `anomalib 2.7.0`, PyTorch 2.14.1 (CUDA 12.6) on an RTX
 python -m venv .venv
 # Windows: .venv\Scripts\activate     Linux/macOS: source .venv/bin/activate
 
-# 1) PyTorch with CUDA (pick the right command at https://pytorch.org/get-started/locally/), e.g.:
 python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 
-# 2) the rest
 python -m pip install -r requirements.txt
 ```
 
