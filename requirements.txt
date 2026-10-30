@@ -1,0 +1,7 @@
+anomalib==2.7.0
+lightning
+pandas
+numpy
+matplotlib
+pillow
+# PyTorch / torchvision are installed separately (CUDA build), see README

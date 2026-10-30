@@ -1,0 +1,13 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+data/
+runs/
+lightning_logs/
+results.csv
+results_backup_*.csv
+*_before_migration.csv
+*.ckpt
+.DS_Store

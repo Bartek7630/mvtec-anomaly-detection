@@ -1,0 +1,31 @@
+data,category,model,backbone,layers,image_size,coreset_ratio,num_neighbors,seed,n_train,n_test_images,image_AUROC,image_F1Score,pixel_AUROC,pixel_AUPRO,pixel_F1Score,fit_s,test_s
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,256,0.01,9.0,42,,160,0.9504,0.9465,0.9805,,0.3684,38.8,19.4
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,256,0.01,9.0,1,,160,0.9547,0.9421,0.9797,,0.3738,37.4,18.5
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,256,0.01,9.0,2,,160,0.9744,0.9483,0.9822,,0.3679,37.3,22.4
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,256,0.01,1.0,42,,160,0.9504,0.9461,0.9805,,0.3684,36.6,18.3
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,256,0.01,1.0,1,,160,0.9547,0.9421,0.9797,,0.3738,36.5,18.5
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,256,0.01,1.0,2,,160,0.9744,0.9483,0.9822,,0.3679,36.8,19.1
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,256,0.01,3.0,42,,160,0.9461,0.9451,0.9805,,0.3684,37.4,21.7
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,256,0.01,3.0,1,,160,0.9504,0.9417,0.9797,,0.3738,38.7,19.8
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,256,0.01,3.0,2,,160,0.9606,0.9391,0.9822,,0.3679,37.6,18.5
+MVTecAD,screw,patchcore,resnet18,layer2+layer3,256,0.01,9.0,42,,160,0.9557,0.9451,0.9836,,0.3831,36.2,18.6
+MVTecAD,screw,patchcore,resnet18,layer2+layer3,256,0.01,9.0,1,,160,0.9553,0.9383,0.9861,,0.378,36.7,18.7
+MVTecAD,screw,patchcore,resnet18,layer2+layer3,256,0.01,9.0,2,,160,0.9465,0.928,0.9861,,0.3819,36.1,18.4
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,384,0.01,9.0,42,,160,0.974,0.9669,0.9914,,0.489,1230.2,26.2
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,384,0.01,9.0,1,,160,0.9789,0.9667,0.9934,,0.4855,1231.5,26.2
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,384,0.01,9.0,2,,160,0.9744,0.963,0.9917,,0.4905,1231.6,25.6
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,384,0.01,1.0,42,,160,0.974,0.9669,0.9914,,0.489,1237.0,26.2
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,384,0.01,1.0,1,,160,0.9787,0.9667,0.9934,,0.4855,1229.8,26.0
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,384,0.01,1.0,2,,160,0.9744,0.963,0.9917,,0.4905,1229.6,26.7
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,384,0.01,3.0,42,,160,0.9602,0.9583,0.9914,,0.489,1234.3,26.7
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,384,0.01,3.0,1,,160,0.9652,0.9669,0.9934,,0.4855,1239.5,33.4
+MVTecAD,screw,patchcore,wide_resnet50_2,layer2+layer3,384,0.01,3.0,2,,160,0.9559,0.9583,0.9917,,0.4905,1258.8,33.8
+MVTecAD,screw,padim,resnet18,layer1+layer2+layer3,256,,,42,,160,0.76,0.8625,0.974,,0.2064,20.1,18.3
+MVTecAD,screw,padim,resnet18,layer1+layer2+layer3,256,,,1,,160,0.7675,0.8667,0.9776,,0.2239,19.5,19.6
+MVTecAD,screw,padim,resnet18,layer1+layer2+layer3,256,,,2,,160,0.7504,0.8764,0.9774,,0.2164,18.8,18.6
+MVTecAD,screw,padim,resnet18,layer1+layer2+layer3,384,,,42,,160,0.7461,0.8539,0.9794,,0.2103,24.7,25.0
+MVTecAD,screw,padim,resnet18,layer1+layer2+layer3,384,,,1,,160,0.7506,0.8699,0.9804,,0.2341,23.5,33.3
+MVTecAD,screw,padim,resnet18,layer1+layer2+layer3,384,,,2,,160,0.6995,0.8582,0.9804,,0.2232,28.8,32.9
+MVTecAD,screw,padim,wide_resnet50_2,layer1+layer2+layer3 d=200,256,,,42,,160,0.8101,0.8835,0.9765,,0.2426,21.6,18.6
+MVTecAD,screw,padim,wide_resnet50_2,layer1+layer2+layer3 d=200,256,,,1,,160,0.8243,0.8839,0.9739,,0.2241,20.9,19.0
+MVTecAD,screw,padim,wide_resnet50_2,layer1+layer2+layer3 d=200,256,,,2,,160,0.8532,0.8954,0.9751,,0.2331,21.0,19.5
