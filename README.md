@@ -2,7 +2,7 @@
 
 Small manufacturers rarely have thousands of labelled defect images. They usually have **some photos of good parts and almost no photos of defects**. This project studies how well two unsupervised anomaly-detection methods, **PatchCore** and **PaDiM**, work in that situation, and how performance changes when only a handful of good training images is available.
 
-It is the experimental part of my BSc thesis in Artificial Intelligence (Catholic University of Lublin). All results come from one reproducible script and are stored as CSV files in this repository.
+It is the experimental part of my BSc thesis in Artificial Intelligence. All results come from one reproducible script and are stored as CSV files in this repository.
 
 ![Few-shot curve](figures/few_shot_curve.png)
 
