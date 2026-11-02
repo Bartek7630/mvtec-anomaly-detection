@@ -41,6 +41,8 @@ def parse_args():
     p.add_argument("--out", default="results.csv", help="CSV file to append results to")
     p.add_argument("--results-dir", default="runs", help="folder for anomalib output and error-case figures")
     p.add_argument("--save-errors", action="store_true", help="save a figure with the worst false positive and false negative")
+    p.add_argument("--save-scores", action="store_true", help="save the score of every test image to a CSV file")
+    p.add_argument("--scores-dir", default="scores", help="folder for the per-image score files")
     p.add_argument("--no-pretrained", action="store_true", help="random backbone weights (smoke tests only)")
     p.add_argument("--n-train", type=int, default=None, help="few-shot: randomly sample this many training images per seed")
     args = p.parse_args()
@@ -69,14 +71,8 @@ def make_train_subset(src_dir: Path, n: int, seed: int, category: str) -> Path:
     return out
 
 
-def save_error_cases(engine, model, datamodule, out_png):
-    """Save the good image with the highest score (false positive) and the defective one with the lowest (false negative)."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    import numpy as np
-    from PIL import Image
-
+def collect_predictions(engine, model, datamodule):
+    """Run the model on the test images and return one dict per image (path, true label, score, map, mask)."""
     items = []
     for b in engine.predict(model=model, datamodule=datamodule, return_predictions=True):
         for i, path in enumerate(b.image_path):
@@ -88,6 +84,40 @@ def save_error_cases(engine, model, datamodule, out_png):
                 "amap": b.anomaly_map[i].cpu().numpy(),
                 "mask": None if b.gt_mask is None else b.gt_mask[i].cpu().numpy(),
             })
+    return items
+
+
+def scores_file(args, seed):
+    """File name that identifies the run, so that runs with different settings never overwrite each other."""
+    parts = [args.category, args.model, args.backbone, f"s{args.image_size}"]
+    if args.model == "patchcore":
+        parts.append(f"cr{args.coreset_ratio}")
+    elif args.n_features:
+        parts.append(f"d{args.n_features}")
+    parts += [f"n{args.n_train or 'all'}", f"seed{seed}"]
+    return Path(args.scores_dir) / ("_".join(parts) + ".csv")
+
+
+def save_scores(items, out_csv):
+    """Save path (relative to the category folder, e.g. test/good/000.png), true label and score of every test image."""
+    out_csv = Path(out_csv)
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_csv, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["path", "label", "score"])
+        for x in items:
+            w.writerow(["/".join(Path(x["path"]).parts[-3:]), x["label"], round(x["score"], 6)])
+    print("Saved scores:", out_csv)
+
+
+def save_error_cases(items, out_png):
+    """Save the good image with the highest score (false positive) and the defective one with the lowest (false negative)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from PIL import Image
+
     good = [x for x in items if x["label"] == 0]
     bad = [x for x in items if x["label"] == 1]
     cases = [
@@ -179,9 +209,13 @@ def _run(args, seed, normal_dir):
     metrics = engine.test(model=model, datamodule=datamodule)[0]
     t_test = time.time() - t0
 
-    if args.save_errors:
-        name = f"errors_{args.model}_{args.backbone}_{args.image_size}_n{args.n_train or 'all'}_seed{seed}.png"
-        save_error_cases(engine, model, datamodule, Path(args.results_dir) / name)
+    if args.save_errors or args.save_scores:
+        items = collect_predictions(engine, model, datamodule)
+        if args.save_scores:
+            save_scores(items, scores_file(args, seed))
+        if args.save_errors:
+            name = f"errors_{args.model}_{args.backbone}_{args.image_size}_n{args.n_train or 'all'}_seed{seed}.png"
+            save_error_cases(items, Path(args.results_dir) / name)
 
     return {
         "data": "MVTecAD", "category": args.category, "model": args.model, "backbone": args.backbone,
