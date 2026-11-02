@@ -1,0 +1,3 @@
+method,fold_0,fold_1,fold_2,fold_3,mean,std_across_folds
+screw_padim_wide_resnet50_2_s256_d200_nall,0.8851,0.8089,0.7244,0.91,0.8321,0.0837
+screw_patchcore_wide_resnet50_2_s256_cr0.01_nall,0.954,0.97,0.9533,0.9667,0.961,0.0086
