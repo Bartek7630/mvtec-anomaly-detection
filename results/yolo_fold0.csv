@@ -1,3 +1,0 @@
-run,imgsz,fold,n_images,image_AUROC,pixel_AUROC
-fold0_all_640,640,0,40,0.9373,0.9712
-fold0_all_1024,1024,0,40,0.9122,0.9676
