@@ -29,6 +29,10 @@ def parse_args():
     p.add_argument("--name", default=None, help="label of this run in the output files (default: weights folder name)")
     p.add_argument("--scores-dir", default="scores_yolo")
     p.add_argument("--out", default="results_yolo.csv", help="CSV file to append the metrics to")
+    p.add_argument("--n-defect", type=int, default=None,
+                   help="few-shot runs: number of defective training images (only written to the CSV; default: all)")
+    p.add_argument("--train-seed", type=int, default=None,
+                   help="few-shot runs: seed used for choosing the images and for training (only written to the CSV)")
     p.add_argument("--neg-per-image", type=int, default=25000, help="background pixels sampled per image for pixel AUROC")
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
@@ -53,8 +57,12 @@ def load_mask(root: Path, defect_type: str, stem: str, shape):
     if defect_type == "good":
         return np.zeros(shape, dtype=bool)
     mask = cv2.imread(str(root / "ground_truth" / defect_type / f"{stem}_mask.png"), cv2.IMREAD_GRAYSCALE)
-    if mask is None or mask.shape != tuple(shape):
-        raise ValueError(f"Missing or wrongly sized mask for {defect_type}/{stem}")
+    if mask is None:
+        raise ValueError(f"Could not read mask for {defect_type}/{stem}")
+    if mask.ndim == 3:
+        mask = mask[:, :, 0]
+    if mask.shape != tuple(shape):
+        raise ValueError(f"Mask for {defect_type}/{stem} has shape {mask.shape}, expected {tuple(shape)}")
     return mask > 0
 
 
@@ -105,12 +113,18 @@ def main():
             w.writerow([path, label, round(score, 6)])
 
     out = Path(args.out)
+    header = ["run", "imgsz", "fold", "n_defect", "train_seed", "n_images", "image_AUROC", "pixel_AUROC"]
     new_file = not out.exists()
+    if not new_file and out.read_text(encoding="utf-8").splitlines()[0] != ",".join(header):
+        raise SystemExit(f"{out} has a different header (an older version of this script wrote it). "
+                         f"Use another file with --out, or rename the old one.")
     with open(out, "a", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         if new_file:
-            w.writerow(["run", "imgsz", "fold", "n_images", "image_AUROC", "pixel_AUROC"])
-        w.writerow([name, args.imgsz, args.fold, len(rows), round(image_auroc, 4), round(pixel_auroc, 4)])
+            w.writerow(header)
+        w.writerow([name, args.imgsz, args.fold, args.n_defect if args.n_defect is not None else "all",
+                    "" if args.train_seed is None else args.train_seed,
+                    len(rows), round(image_auroc, 4), round(pixel_auroc, 4)])
 
     print(f"{name} | fold {args.fold} | {len(rows)} images")
     print(f"image AUROC: {image_auroc:.4f}")
