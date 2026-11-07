@@ -4,4 +4,6 @@ pandas
 numpy
 matplotlib
 pillow
+scikit-learn
+ultralytics
 # PyTorch / torchvision are installed separately (CUDA build), see README

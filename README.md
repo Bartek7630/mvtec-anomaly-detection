@@ -1,10 +1,10 @@
-# Visual anomaly detection with limited data: PatchCore vs PaDiM on MVTec AD
+# Visual anomaly detection with limited data: PatchCore, PaDiM and a supervised YOLOv8 baseline on MVTec AD
 
-Small manufacturers rarely have thousands of labelled defect images. They usually have **some photos of good parts and almost no photos of defects**. This project studies how well two unsupervised anomaly-detection methods, **PatchCore** and **PaDiM**, work in that situation, and how performance changes when only a handful of good training images is available.
+Small manufacturers rarely have thousands of labelled defect images. They usually have **some photos of good parts and almost no photos of defects**. This project studies how well two unsupervised anomaly-detection methods, **PatchCore** and **PaDiM**, work in that situation, and how performance changes when only a handful of good training images is available. A **supervised YOLOv8 detector**, trained on defect images with bounding boxes, serves as the baseline that answers the practical question: *when is it worth collecting labelled defects instead of using only good images?*
 
-It is the experimental part of my BSc thesis in Artificial Intelligence. All results come from one reproducible script and are stored as CSV files in this repository.
+It is the experimental part of my BSc thesis in Artificial Intelligence (Catholic University of Lublin). All results come from the scripts in this repository and are stored as CSV files in this repository.
 
-![Few-shot curve](figures/few_shot_curve.png)
+![Anomaly detection vs supervised YOLO](figures/anomaly_vs_supervised.png)
 
 ## Key findings
 
@@ -13,7 +13,10 @@ It is the experimental part of my BSc thesis in Artificial Intelligence. All res
 3. **Few-shot (`screw`, PatchCore):** with 1, 5 or 10 good training images image AUROC stays close to chance (0.49 / 0.55 / 0.60). At 50 images it jumps to 0.85, and with all 320 images it reaches 0.96.
 4. **Localisation needs fewer images than detection.** Pixel AUROC (0.981) and AUPRO (0.912) at N = 50 already match the full-data values, while image AUROC does not.
 5. **Image diversity matters more than memory-bank size.** With the same 50 images, shrinking the bank from 51,200 to 5,120 patches costs about 0.02 image AUROC. Yet the full-data model uses only 3,276 patches and scores 0.96. A bank of 512 patches is too small (0.76).
-6. **Image F1 can mislead.** 74% of the `screw` test images are defective, so predicting "defective" for everything already gives F1 = 0.853. Judge few-shot runs by AUROC.
+6. **Supervised YOLOv8s does not beat PatchCore on `screw`.** Trained on about 90 defective images (plus about 30 good ones) and tested on held-out folds, it reaches image AUROC 0.908 (640 px) and 0.926 (1024 px), against 0.961 for PatchCore and 0.832 for PaDiM (means over 4 folds). The difference between the two YOLO image sizes is within noise.
+7. **YOLO needs defective examples and is unstable with few of them.** With N = 5 / 10 / 20 / 50 defective training images the image AUROC is 0.66 / 0.79 / 0.81 / 0.89. The gain flattens after 50 images, N = 10 vs 20 is within noise, and single trainings with the same N differ by 0.05-0.09 AUROC depending on which images were drawn.
+8. **The two few-shot curves cannot be compared point by point.** N counts good images for PatchCore and defective images for YOLO, and the two methods are trained on different data (see Limitations). The combined figure shows both curves for orientation only.
+9. **Image F1 can mislead.** 74% of the `screw` test images are defective, so predicting "defective" for everything already gives F1 = 0.853. Judge few-shot runs by AUROC.
 
 ## Results
 
@@ -71,11 +74,35 @@ The last row uses a different coreset size than the others. To check that this d
 
 Higher resolution helps PatchCore on `screw` (small defects) but is about 30 times slower to fit. The number of neighbours `k` only changes the image-level score, never the anomaly map, so pixel metrics are identical for every `k`. Pixel AUPRO is not available for this ablation (it was added to the script later).
 
+### Supervised baseline: YOLOv8s on `screw`
+
+**Protocol.** The 160 test images are split once into 4 stratified folds of 40 (`splits/screw_folds.csv`). The anomaly detectors are trained on the 320 good training images and their scores are cut into the same folds. For each fold, YOLOv8s is trained on the test images of the *other three folds* (about 120 images, about 90 defective, with boxes derived from the ground-truth masks) and scored on the held-out fold, so every test image is scored once by a model that never saw it. Image score = highest box confidence (0 if there is no box). Folds are averaged; the standard deviation is taken across folds (n - 1).
+
+| method | fold 0 | fold 1 | fold 2 | fold 3 | mean ± std over folds |
+|---|---|---|---|---|---|
+| PatchCore (3 seeds) | 0.954 | 0.970 | 0.953 | 0.967 | 0.961 ± 0.009 |
+| PaDiM (3 seeds) | 0.885 | 0.809 | 0.724 | 0.910 | 0.832 ± 0.084 |
+| YOLOv8s, 640 px | 0.937 | 0.933 | 0.907 | 0.853 | 0.908 ± 0.039 |
+| YOLOv8s, 1024 px | 0.912 | 0.913 | 0.913 | 0.967 | 0.926 ± 0.027 |
+
+**Few-shot YOLO.** For each fold, N defective images (plus the same number of good ones, as far as the pool has them) are drawn at random, with 3 different draws per N. The number of training iterations is kept near 1,500 for every N, so the number of epochs shrinks as N grows.
+
+| N defective images | image AUROC (mean ± std over folds) | worst - best fold | std over draws (mean) |
+|---|---|---|---|
+| 5 | 0.664 ± 0.066 | 0.587 - 0.733 | 0.082 |
+| 10 | 0.791 ± 0.034 | 0.744 - 0.824 | 0.072 |
+| 20 | 0.814 ± 0.041 | 0.760 - 0.857 | 0.087 |
+| 50 | 0.892 ± 0.037 | 0.839 - 0.923 | 0.049 |
+| all (about 90, 1 training) | 0.908 ± 0.039 | 0.853 - 0.937 | - |
+
+![YOLO few-shot curve](figures/yolo_fewshot_curve.png)
+
 ## Method in short
 
 - **PatchCore** stores features of all patches of the good training images (a *memory bank*) and shrinks it with greedy *coreset* subsampling. A test patch is scored by its distance to the nearest stored patch. The image score is the largest patch score.
 - **PaDiM** models the features at each image position as a Gaussian (mean and covariance over the training images) and scores a test patch by its Mahalanobis distance to that Gaussian.
 - Both use an ImageNet-pretrained CNN as a frozen feature extractor. **No defect image is ever used for training.**
+- **YOLOv8s** is a supervised object detector. It is trained on images with defect bounding boxes and used here as an anomaly detector: the image score is the highest box confidence (`conf = 0.001`), and the anomaly map is built from the predicted boxes.
 
 ## Metrics
 
@@ -95,8 +122,10 @@ Tested with Python 3.10+, `anomalib 2.7.0`, PyTorch 2.14.1 (CUDA 12.6) on an RTX
 python -m venv .venv
 # Windows: .venv\Scripts\activate     Linux/macOS: source .venv/bin/activate
 
+# 1) PyTorch with CUDA (pick the right command at https://pytorch.org/get-started/locally/), e.g.:
 python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 
+# 2) the rest
 python -m pip install -r requirements.txt
 ```
 
@@ -145,17 +174,64 @@ done
 python analysis/make_report.py
 ```
 
+### Reproducing the supervised comparison (`screw`)
+
+```bash
+# 1) the folds (once) and the per-image scores of the anomaly detectors (one file per seed in scores/)
+python make_splits.py --root data/mvtec/screw --out splits/screw_folds.csv
+python run_experiment.py --root data/mvtec/screw --category screw --model patchcore --backbone wide_resnet50_2 --coreset-ratio 0.01 --seeds 42 1 2 --save-scores --out results.csv
+python run_experiment.py --root data/mvtec/screw --category screw --model padim --backbone wide_resnet50_2 --n-features 200 --seeds 42 1 2 --save-scores --out results.csv
+
+# 2) YOLO, for every fold k = 0..3 and image size 640 / 1024 (run names are fold<k>_all_<size>)
+python make_yolo_data.py --root data/mvtec/screw --fold 0 --out yolo_data/fold0
+yolo detect train data=yolo_data/fold0/data.yaml model=yolov8s.pt imgsz=640 epochs=100 batch=8 seed=42 val=False name=fold0_all_640
+python yolo_scores.py --weights runs/detect/fold0_all_640/weights/last.pt --data-dir yolo_data/fold0 \
+    --root data/mvtec/screw --fold 0 --imgsz 640 --name fold0_all_640 --out results/yolo_folds.csv
+
+# 3) glue the four folds together and compute AUROC per fold for all methods
+python merge_yolo_scores.py
+python eval_folds.py
+
+# 4) few-shot YOLO: N defective images, draw (seed) S; epochs = ceil(1500 / ceil(n_train_images / 8))
+python make_yolo_data.py --root data/mvtec/screw --fold 0 --n-defect 10 --seed 42     # -> yolo_data/fold0_n10_seed42
+#    train as above with name=fold0_n10_seed42_640, then score:
+python yolo_scores.py --weights runs/detect/fold0_n10_seed42_640/weights/last.pt --data-dir yolo_data/fold0_n10_seed42 \
+    --root data/mvtec/screw --fold 0 --imgsz 640 --name fold0_n10_seed42_640 --n-defect 10 --train-seed 42 --out results/yolo_fewshot.csv
+
+# 5) tables and figures
+python analysis/yolo_fewshot.py            # YOLO learning curve
+python analysis/anomaly_vs_supervised.py   # both curves in one figure
+python analysis/per_defect_type.py --root data/mvtec/screw   # AUROC and missed images per defect type
+```
+
+The fixed training settings (`val=False`, last weights, no selection on the test folds) were chosen before looking at any result, so that the folds stay a fair test. `yolo_data/`, `runs/` and `*.pt` are not committed: they are derived from the MVTec AD images.
+
 ## Repository structure
 
 ```
-run_experiment.py        # experiment runner (PatchCore / PaDiM, few-shot, CSV logging)
-analysis/make_report.py  # builds the tables (results/summary.md) and the figures
+run_experiment.py        # experiment runner (PatchCore / PaDiM, few-shot, CSV logging, per-image scores)
+make_splits.py           # 4 stratified folds of the screw test images -> splits/screw_folds.csv
+make_yolo_data.py        # YOLO dataset for one fold (boxes from masks), optional N defective images
+yolo_scores.py           # per-image YOLO scores and image / pixel AUROC for one held-out fold
+merge_yolo_scores.py     # glues the 4 fold score files of YOLO into one 160-row file
+eval_folds.py            # AUROC per fold, mean and std across folds for all methods
+analysis/
+  make_report.py         # tables (results/summary.md) and figures of the PatchCore / PaDiM study
+  yolo_fewshot.py        # table and learning curve of the few-shot YOLO experiment
+  anomaly_vs_supervised.py  # both few-shot curves + PaDiM line in one figure
+  per_defect_type.py     # AUROC and missed images per defect type
+splits/screw_folds.csv   # fold of every test image (path, defect_type, label, fold)
+scores/                  # per-image scores of every run (path, label, score)
 results/
   four_categories.csv    # 24 runs: 4 categories x 2 methods x 3 seeds
   few_shot.csv           # 21 runs: N = 1, 5, 10, 50 (+ coreset control) and N = 320
   ablation_screw.csv     # 30 runs: neighbours, backbone, resolution, PaDiM backbones
-  summary.md             # all tables
-figures/                 # PNG figures used in this README
+  folds_summary.csv, fold_auroc_per_run.csv   # AUROC per fold for all methods
+  yolo_folds.csv         # YOLO trained on all defective images of the other folds
+  yolo_fewshot.csv, yolo_fewshot_summary.csv  # 48 few-shot YOLO runs and their summary
+  anomaly_vs_supervised.csv   # data of the combined figure
+  summary.md             # tables of the PatchCore / PaDiM study
+figures/                 # PNG figures
 ```
 
 CSV columns: `data, category, model, backbone, layers, image_size, coreset_ratio, num_neighbors, seed, n_train, n_test_images, image_AUROC, image_F1Score, pixel_AUROC, pixel_AUPRO, pixel_F1Score, fit_s, test_s`. Empty cells mean "not applicable" (e.g. `coreset_ratio` for PaDiM).
@@ -164,7 +240,11 @@ CSV columns: `data, category, model, backbone, layers, image_size, coreset_ratio
 
 - **Only 3 seeds per setting.** Standard deviations are rough estimates. Differences smaller than about 0.03 AUROC should not be read as real (for instance N = 1 vs 5 vs 10, or 100% vs 10% coreset).
 - **The F1 threshold is chosen on the test set** (the validation split equals the test split, `ValSplitMode.SAME_AS_TEST`), so image F1 and pixel F1 are optimistic. AUROC and AUPRO do not depend on a threshold.
-- **The few-shot study covers a single category** (`screw`). Results for other categories can differ.
+- **The few-shot and supervised studies cover a single category** (`screw`). Results for other categories can differ.
+- **The supervised comparison has only 4 folds** of 40 images (one image pair is worth about 0.003 AUROC), one YOLO training per fold for the all-data point and 3 draws per N in the few-shot study. Differences below about 0.03 AUROC are noise.
+- **YOLO and the anomaly detectors see different training data.** Both are scored on the same 160 test images, but the anomaly detectors train on the 320 good images of `train/good`, while YOLO trains on test images of the other folds (defective images and some good ones). N therefore counts good images for PatchCore and defective images for YOLO, and PatchCore is scored in one pass while YOLO is scored fold by fold with 4 different models (AUROC averaged).
+- YOLO image scores are the highest box confidence, so images without any box get 0 and tie. YOLO pixel AUROC (about 0.98) is computed from rectangles and is not comparable with the anomaly maps of PatchCore / PaDiM.
+- The training settings of YOLO (YOLOv8s, 100 epochs for the all-data runs, about 1,500 iterations in the few-shot runs) were fixed in advance and not tuned.
 - PaDiM uses 200 channels instead of the 550 recommended for WideResNet-50 (GPU memory), so it may be slightly handicapped.
 - The explanation for why `screw` needs many images (screws appear in many orientations, and defects are tiny) is a hypothesis that I did not test.
 - Results are specific to this hardware and library version. GPU results are reproducible for a given seed, but CPU and GPU runs differ slightly.
@@ -174,11 +254,12 @@ CSV columns: `data, category, model, backbone, layers, image_size, coreset_ratio
 - K. Roth et al., *Towards Total Recall in Industrial Anomaly Detection* (PatchCore), CVPR 2022. [arXiv:2106.08265](https://arxiv.org/abs/2106.08265)
 - T. Defard et al., *PaDiM: a Patch Distribution Modeling Framework for Anomaly Detection and Localization*, 2020. [arXiv:2011.08785](https://arxiv.org/abs/2011.08785)
 - P. Bergmann et al., *MVTec AD: A Comprehensive Real-World Dataset for Unsupervised Anomaly Detection*, CVPR 2019.
+- G. Jocher et al., *Ultralytics YOLOv8*. [github.com/ultralytics/ultralytics](https://github.com/ultralytics/ultralytics)
 - S. Akcay et al., *Anomalib: A Deep Learning Library for Anomaly Detection*. [arXiv:2202.08341](https://arxiv.org/abs/2202.08341)
 
 ## License and data
 
-The code is released under the MIT license (see `LICENSE`). The MVTec AD dataset is **not** included and is licensed by MVTec under CC BY-NC-SA 4.0 (non-commercial use). Please follow its terms.
+The code is released under the MIT license (see `LICENSE`). The MVTec AD dataset (and the YOLO datasets derived from it) is **not** included and is licensed by MVTec under CC BY-NC-SA 4.0 (non-commercial use). Please follow its terms.
 
 ## Author
 
