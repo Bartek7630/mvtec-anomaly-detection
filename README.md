@@ -16,7 +16,8 @@ It is the experimental part of my BSc thesis in Artificial Intelligence (Catholi
 6. **Supervised YOLOv8s does not beat PatchCore on `screw`.** Trained on about 90 defective images (plus about 30 good ones) and tested on held-out folds, it reaches image AUROC 0.908 (640 px) and 0.926 (1024 px), against 0.961 for PatchCore and 0.832 for PaDiM (means over 4 folds). The difference between the two YOLO image sizes is within noise.
 7. **YOLO needs defective examples and is unstable with few of them.** With N = 5 / 10 / 20 / 50 defective training images the image AUROC is 0.66 / 0.79 / 0.81 / 0.89. The gain flattens after 50 images, N = 10 vs 20 is within noise, and single trainings with the same N differ by 0.05-0.09 AUROC depending on which images were drawn.
 8. **The two few-shot curves cannot be compared point by point.** N counts good images for PatchCore and defective images for YOLO, and the two methods are trained on different data (see Limitations). The combined figure shows both curves for orientation only.
-9. **Image F1 can mislead.** 74% of the `screw` test images are defective, so predicting "defective" for everything already gives F1 = 0.853. Judge few-shot runs by AUROC.
+9. **The methods fail on different defects.** `thread_side` is the hardest type for all three (image AUROC 0.917 PatchCore, 0.829 YOLO, 0.681 PaDiM). YOLO is clearly weaker than PatchCore on `manipulated_front` (0.811 vs 0.941) and at least as good on `scratch_head` (0.996 vs 0.970). No defective image is missed by PatchCore alone, and 10 of the 119 are missed by all three methods.
+10. **Image F1 can mislead.** 74% of the `screw` test images are defective, so predicting "defective" for everything already gives F1 = 0.853. Judge few-shot runs by AUROC.
 
 ## Results
 
@@ -96,6 +97,28 @@ Higher resolution helps PatchCore on `screw` (small defects) but is about 30 tim
 | all (about 90, 1 training) | 0.908 ± 0.039 | 0.853 - 0.937 | - |
 
 ![YOLO few-shot curve](figures/yolo_fewshot_curve.png)
+
+### Error analysis by defect type (`screw`)
+
+AUROC of "all 41 good test images vs the defective images of one type" (n = number of defective images). PatchCore and PaDiM: mean over 3 seeds; YOLO: one training per fold, scores of the 4 fold models pooled. Recall = share of defective images found when the threshold keeps 95% of the good images below it.
+
+| defect type | n | AUROC PatchCore | AUROC PaDiM | AUROC YOLO 640 | recall PatchCore | recall PaDiM | recall YOLO 640 |
+|---|---|---|---|---|---|---|---|
+| manipulated_front | 24 | 0.941 ± 0.020 | 0.922 ± 0.036 | 0.811 | 0.67 | 0.79 | 0.13 |
+| scratch_head | 24 | 0.970 ± 0.012 | 0.848 ± 0.019 | 0.996 | 0.83 | 0.50 | 0.96 |
+| scratch_neck | 25 | 0.991 ± 0.008 | 0.889 ± 0.039 | 0.963 | 0.96 | 0.76 | 0.92 |
+| thread_side | 23 | 0.917 ± 0.016 | 0.681 ± 0.053 | 0.829 | 0.52 | 0.17 | 0.35 |
+| thread_top | 23 | 0.978 ± 0.015 | 0.795 ± 0.026 | 0.943 | 0.91 | 0.30 | 0.87 |
+| all defects | 119 | 0.960 ± 0.013 | 0.829 ± 0.022 | 0.909 | 0.78 | 0.51 | 0.65 |
+
+![AUROC by defect type](figures/auroc_by_defect_type.png)
+
+Reading the table:
+
+- **AUROC and recall can disagree.** AUROC compares all pairs of good and defective images, recall looks only at the strict end of the ranking. For YOLO on `manipulated_front` the AUROC is 0.81 but only 3 of 24 images are found: many good images get high box confidences, so a threshold that keeps 95% of them below it rejects almost every defect of this type.
+- **Overlap of the misses.** At this threshold PatchCore misses 26 images, YOLO 42 and PaDiM 58. Every image PatchCore misses is also missed by at least one other method; 17 of its 26 misses are also YOLO misses, and 10 images are missed by all three methods (mostly `thread_side` and `manipulated_front`).
+- **What the most-missed images look like** (the two lowest-scoring images of each method, checked by eye): small defects on the flank of the thread (for example three tiny spots in `thread_side/000`, the most missed image of both PatchCore and YOLO), a small defect at the very tip of the screw (`manipulated_front/022`, YOLO), and a deformed piece of thread with low contrast to the surrounding thread (`thread_top/003`, PatchCore; `thread_side/016` and `021`, PaDiM). These are observations from 2 images per method, not a tested explanation.
+- **Caveats.** Each type has 23-25 images, so differences of about 0.03 AUROC between types or methods are not reliable. YOLO has no seed standard deviation (one training per fold), and its scores come from 4 different models. The pooled YOLO AUROC (0.909) is close to, but not the same as, the mean over folds (0.908). The threshold (95% of good images) is arbitrary; other values would change the recall numbers, not the AUROC.
 
 ## Method in short
 
