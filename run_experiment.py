@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+import math
 import time
 from datetime import datetime
 from pathlib import Path
@@ -20,9 +21,13 @@ from anomalib.models import Padim, Patchcore, Stfpm
 
 CSV_COLUMNS = [
     "data", "category", "model", "backbone", "layers", "image_size", "coreset_ratio",
-    "num_neighbors", "epochs", "seed", "n_train", "n_test_images",
+    "num_neighbors", "epochs", "steps", "seed", "n_train", "n_test_images",
     "image_AUROC", "image_F1Score", "pixel_AUROC", "pixel_AUPRO", "pixel_F1Score", "fit_s", "test_s",
 ]
+
+
+TRAIN_BATCH = 16     # training batch size; the number of steps per epoch is ceil(images / TRAIN_BATCH)
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".bmp"}
 
 
 def parse_args():
@@ -46,6 +51,10 @@ def parse_args():
     p.add_argument("--no-pretrained", action="store_true", help="random backbone weights (smoke tests only)")
     p.add_argument("--n-train", type=int, default=None, help="few-shot: randomly sample this many training images per seed")
     p.add_argument("--epochs", type=int, default=100, help="STFPM only: number of training epochs (the paper uses 100)")
+    p.add_argument("--iterations", type=int, default=None,
+                   help="STFPM only: target number of training steps. The number of epochs is then computed as "
+                        "ceil(iterations / ceil(n_images / 16)) and overrides --epochs, so that runs with different "
+                        "numbers of training images get the same number of steps (100 epochs on 320 images = 2000 steps)")
     p.add_argument("--val-every", type=int, default=None,
                    help="STFPM only: validate every N epochs (default: only after the last epoch, which saves time)")
     args = p.parse_args()
@@ -53,6 +62,8 @@ def parse_args():
         p.error("--no-pretrained is not supported for stfpm (its teacher is always pretrained)")
     if args.epochs < 1:
         p.error("--epochs must be >= 1")
+    if args.iterations is not None and (args.model != "stfpm" or args.iterations < 1):
+        p.error("--iterations needs --model stfpm and a value >= 1")
     if args.n_train is not None and args.n_train < 1:
         p.error("--n-train must be >= 1")
     if args.model == "padim" and args.n_train == 1:
@@ -174,7 +185,7 @@ def _run(args, seed, normal_dir):
         val_split_mode=ValSplitMode.SAME_AS_TEST,
         seed=seed,
         num_workers=0,
-        train_batch_size=16,
+        train_batch_size=TRAIN_BATCH,
         eval_batch_size=16,
     )
 
@@ -200,7 +211,7 @@ def _run(args, seed, normal_dir):
             evaluator=evaluator,
         )
     elif args.model == "stfpm":
-        model = Stfpm(                      # the teacher is always pretrained; there is no pre_trained argument
+        model = Stfpm(
             backbone=args.backbone,
             layers=("layer1", "layer2", "layer3"),
             pre_processor=pre_processor,
@@ -216,6 +227,15 @@ def _run(args, seed, normal_dir):
             evaluator=evaluator,
         )
 
+    steps_per_epoch = None
+    if args.model == "stfpm":
+        folder = Path(normal_dir) if Path(normal_dir).is_absolute() else root / normal_dir
+        n_images = sum(1 for f in Path(folder).iterdir() if f.suffix.lower() in IMAGE_SUFFIXES)
+        steps_per_epoch = math.ceil(n_images / TRAIN_BATCH)
+        if args.iterations:
+            args.epochs = math.ceil(args.iterations / steps_per_epoch)
+        print(f"STFPM: {n_images} training images, {steps_per_epoch} steps per epoch, {args.epochs} epochs "
+              f"= {args.epochs * steps_per_epoch} steps")
     if args.model == "stfpm":
         # anomalib sets no max_epochs for STFPM (Lightning would then train for 1000 epochs), so set it explicitly
         engine = Engine(accelerator=args.accelerator, default_root_dir=args.results_dir, max_epochs=args.epochs,
@@ -246,7 +266,8 @@ def _run(args, seed, normal_dir):
         "image_size": args.image_size,
         "coreset_ratio": args.coreset_ratio if args.model == "patchcore" else None,
         "num_neighbors": args.num_neighbors if args.model == "patchcore" else None,
-        "epochs": args.epochs if args.model == "stfpm" else None, "seed": seed,
+        "epochs": args.epochs if args.model == "stfpm" else None,
+        "steps": args.epochs * steps_per_epoch if args.model == "stfpm" else None, "seed": seed,
         "n_train": len(datamodule.train_data), "n_test_images": len(datamodule.test_data),
         "image_AUROC": metrics.get("image_AUROC"), "image_F1Score": metrics.get("image_F1Score"),
         "pixel_AUROC": metrics.get("pixel_AUROC"), "pixel_AUPRO": metrics.get("pixel_AUPRO"),
