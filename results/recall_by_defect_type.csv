@@ -9,6 +9,11 @@ screw_patchcore_wide_resnet50_2_s256_cr0.01_nall,scratch_head,24,20,0.8333,0.609
 screw_patchcore_wide_resnet50_2_s256_cr0.01_nall,scratch_neck,25,24,0.96,0.609
 screw_patchcore_wide_resnet50_2_s256_cr0.01_nall,thread_side,23,12,0.5217,0.609
 screw_patchcore_wide_resnet50_2_s256_cr0.01_nall,thread_top,23,21,0.913,0.609
+screw_stfpm_resnet18_s256_e100_nall,manipulated_front,24,14,0.5833,0.5664
+screw_stfpm_resnet18_s256_e100_nall,scratch_head,24,16,0.6667,0.5664
+screw_stfpm_resnet18_s256_e100_nall,scratch_neck,25,24,0.96,0.5664
+screw_stfpm_resnet18_s256_e100_nall,thread_side,23,11,0.4783,0.5664
+screw_stfpm_resnet18_s256_e100_nall,thread_top,23,15,0.6522,0.5664
 screw_yolov8s_img640_pool,manipulated_front,24,3,0.125,0.2691
 screw_yolov8s_img640_pool,scratch_head,24,23,0.9583,0.2691
 screw_yolov8s_img640_pool,scratch_neck,25,23,0.92,0.2691

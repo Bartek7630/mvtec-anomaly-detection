@@ -1,4 +1,4 @@
-"""Run PatchCore / PaDiM (anomalib) on one MVTec AD category and append the metrics to a CSV file."""
+"""Run PatchCore / PaDiM / STFPM (anomalib) on one MVTec AD category and append the metrics to a CSV file."""
 
 import argparse
 import csv
@@ -16,11 +16,11 @@ from anomalib.metrics import AUROC, AUPRO, F1Score, Evaluator
 from anomalib.data import Folder
 from anomalib.data.utils import ValSplitMode
 from anomalib.engine import Engine
-from anomalib.models import Padim, Patchcore
+from anomalib.models import Padim, Patchcore, Stfpm
 
 CSV_COLUMNS = [
     "data", "category", "model", "backbone", "layers", "image_size", "coreset_ratio",
-    "num_neighbors", "seed", "n_train", "n_test_images",
+    "num_neighbors", "epochs", "seed", "n_train", "n_test_images",
     "image_AUROC", "image_F1Score", "pixel_AUROC", "pixel_AUPRO", "pixel_F1Score", "fit_s", "test_s",
 ]
 
@@ -29,9 +29,9 @@ def parse_args():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--root", required=True, help="path to one MVTec AD category folder, e.g. data/mvtec/screw")
     p.add_argument("--category", default="screw", help="category name (used for labelling only)")
-    p.add_argument("--model", choices=["patchcore", "padim"], default="patchcore")
+    p.add_argument("--model", choices=["patchcore", "padim", "stfpm"], default="patchcore")
     p.add_argument("--backbone", default=None,
-                   help="default: wide_resnet50_2 for patchcore, resnet18 for padim")
+                   help="default: wide_resnet50_2 for patchcore, resnet18 for padim, resnet18 for stfpm")
     p.add_argument("--n-features", type=int, default=None, help="PaDiM only: number of randomly selected channels")
     p.add_argument("--image-size", type=int, default=256, help="input resolution (square)")
     p.add_argument("--coreset-ratio", type=float, default=0.01, help="PatchCore: fraction of patches kept in the memory bank")
@@ -45,7 +45,14 @@ def parse_args():
     p.add_argument("--scores-dir", default="scores", help="folder for the per-image score files")
     p.add_argument("--no-pretrained", action="store_true", help="random backbone weights (smoke tests only)")
     p.add_argument("--n-train", type=int, default=None, help="few-shot: randomly sample this many training images per seed")
+    p.add_argument("--epochs", type=int, default=100, help="STFPM only: number of training epochs (the paper uses 100)")
+    p.add_argument("--val-every", type=int, default=None,
+                   help="STFPM only: validate every N epochs (default: only after the last epoch, which saves time)")
     args = p.parse_args()
+    if args.model == "stfpm" and args.no_pretrained:
+        p.error("--no-pretrained is not supported for stfpm (its teacher is always pretrained)")
+    if args.epochs < 1:
+        p.error("--epochs must be >= 1")
     if args.n_train is not None and args.n_train < 1:
         p.error("--n-train must be >= 1")
     if args.model == "padim" and args.n_train == 1:
@@ -94,6 +101,8 @@ def scores_file(args, seed):
         parts.append(f"cr{args.coreset_ratio}")
     elif args.n_features:
         parts.append(f"d{args.n_features}")
+    if args.model == "stfpm":
+        parts.append(f"e{args.epochs}")
     parts += [f"n{args.n_train or 'all'}", f"seed{seed}"]
     return Path(args.scores_dir) / ("_".join(parts) + ".csv")
 
@@ -177,7 +186,7 @@ def _run(args, seed, normal_dir):
         F1Score(fields=["pred_mask", "gt_mask"], prefix="pixel_", strict=False),
     ])
 
-    model_cls = Patchcore if args.model == "patchcore" else Padim
+    model_cls = Patchcore if args.model == "patchcore" else Stfpm if args.model == "stfpm" else Padim
     pre_processor = True if args.image_size == 256 else model_cls.configure_pre_processor(
         image_size=(args.image_size, args.image_size))
     if args.model == "patchcore":
@@ -190,6 +199,13 @@ def _run(args, seed, normal_dir):
             pre_processor=pre_processor,
             evaluator=evaluator,
         )
+    elif args.model == "stfpm":
+        model = Stfpm(                      # the teacher is always pretrained; there is no pre_trained argument
+            backbone=args.backbone,
+            layers=("layer1", "layer2", "layer3"),
+            pre_processor=pre_processor,
+            evaluator=evaluator,
+        )
     else:
         model = Padim(
             backbone=args.backbone,
@@ -199,7 +215,13 @@ def _run(args, seed, normal_dir):
             pre_processor=pre_processor,
             evaluator=evaluator,
         )
-    engine = Engine(accelerator=args.accelerator, default_root_dir=args.results_dir)
+
+    if args.model == "stfpm":
+        # anomalib sets no max_epochs for STFPM (Lightning would then train for 1000 epochs), so set it explicitly
+        engine = Engine(accelerator=args.accelerator, default_root_dir=args.results_dir, max_epochs=args.epochs,
+                        check_val_every_n_epoch=args.val_every or args.epochs)
+    else:
+        engine = Engine(accelerator=args.accelerator, default_root_dir=args.results_dir)
 
     t0 = time.time()
     engine.fit(model=model, datamodule=datamodule)
@@ -223,7 +245,8 @@ def _run(args, seed, normal_dir):
             "layer1+layer2+layer3" + (f" d={args.n_features}" if args.n_features else "")),
         "image_size": args.image_size,
         "coreset_ratio": args.coreset_ratio if args.model == "patchcore" else None,
-        "num_neighbors": args.num_neighbors if args.model == "patchcore" else None, "seed": seed,
+        "num_neighbors": args.num_neighbors if args.model == "patchcore" else None,
+        "epochs": args.epochs if args.model == "stfpm" else None, "seed": seed,
         "n_train": len(datamodule.train_data), "n_test_images": len(datamodule.test_data),
         "image_AUROC": metrics.get("image_AUROC"), "image_F1Score": metrics.get("image_F1Score"),
         "pixel_AUROC": metrics.get("pixel_AUROC"), "pixel_AUPRO": metrics.get("pixel_AUPRO"),

@@ -1,4 +1,4 @@
-"""
+"""Which defect types are hard for which method?
 
 Input : scores/*.csv            one file per run (columns path, label, score), name ends with _seed<N>
         splits/screw_folds.csv  (columns path, defect_type, label, fold)
@@ -9,8 +9,6 @@ Output: results/auroc_by_defect_type.csv   AUROC "good vs one defect type" for e
         figures/auroc_by_defect_type.png   bar chart
         figures/missed_<method>.png        the most missed images with their ground-truth mask (needs --root)
 
-Run from the repository folder:
-    python analysis/per_defect_type.py --root C:\\Users\\barte\\Documents\\screw
 """
 
 import argparse
@@ -25,7 +23,7 @@ from sklearn.metrics import roc_auc_score
 
 ROOT_REPO = Path(__file__).resolve().parents[1]
 SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e6e5e1"
-COLORS = {"patchcore": "#d9822b", "yolo": "#2a78d6", "padim": "#8a8984"}
+COLORS = {"patchcore": "#d9822b", "yolo": "#2a78d6", "padim": "#8a8984", "stfpm": "#2a9d8f"}
 
 
 def parse_args():
@@ -33,7 +31,7 @@ def parse_args():
     p.add_argument("--root", default=None, help="MVTec AD category folder (for the pictures of missed images)")
     p.add_argument("--scores-dir", default=str(ROOT_REPO / "scores"))
     p.add_argument("--folds", default=str(ROOT_REPO / "splits" / "screw_folds.csv"))
-    p.add_argument("--methods", nargs="+", default=["patchcore", "padim", "yolov8s_img640"],
+    p.add_argument("--methods", nargs="+", default=["patchcore", "padim", "stfpm", "yolov8s_img640"],
                    help="a score file is used if its method name contains one of these words")
     p.add_argument("--good-kept", type=float, default=0.95, help="share of good images that must stay below the threshold")
     p.add_argument("--n-missed", type=int, default=2, help="how many most-missed images to draw per method")
@@ -65,6 +63,8 @@ def short_name(method: str) -> str:
         return "patchcore"
     if "padim" in method:
         return "padim"
+    if "stfpm" in method:
+        return "stfpm"
     if "yolo" in method:
         return "yolo " + method.split("_img")[-1].split("_")[0] + " px"
     return method

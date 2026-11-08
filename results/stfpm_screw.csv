@@ -1,0 +1,4 @@
+data,category,model,backbone,layers,image_size,coreset_ratio,num_neighbors,epochs,seed,n_train,n_test_images,image_AUROC,image_F1Score,pixel_AUROC,pixel_AUPRO,pixel_F1Score,fit_s,test_s
+MVTecAD,screw,stfpm,resnet18,layer1+layer2+layer3,256,,,100,42,320,160,0.8473,0.8952,0.9307,0.7521,0.294,1245.7,21.3
+MVTecAD,screw,stfpm,resnet18,layer1+layer2+layer3,256,,,100,1,320,160,0.8391,0.8689,0.9828,0.9145,0.3489,1243.9,24.1
+MVTecAD,screw,stfpm,resnet18,layer1+layer2+layer3,256,,,100,2,320,160,0.6924,0.8489,0.9247,0.7235,0.2882,1239.7,21.9
