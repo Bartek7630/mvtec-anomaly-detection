@@ -1,4 +1,10 @@
 method,defect_type,n_defective,auroc,std_seeds,n_seeds
+screw_efficientad_pdn_s_s256_e244_nall,ALL DEFECTS,119,0.9654,,1
+screw_efficientad_pdn_s_s256_e244_nall,manipulated_front,24,0.9909,,1
+screw_efficientad_pdn_s_s256_e244_nall,scratch_head,24,0.9909,,1
+screw_efficientad_pdn_s_s256_e244_nall,scratch_neck,25,0.999,,1
+screw_efficientad_pdn_s_s256_e244_nall,thread_side,23,0.8441,,1
+screw_efficientad_pdn_s_s256_e244_nall,thread_top,23,0.9968,,1
 screw_padim_wide_resnet50_2_s256_d200_nall,ALL DEFECTS,119,0.8292,0.022,3
 screw_padim_wide_resnet50_2_s256_d200_nall,manipulated_front,24,0.9221,0.0357,3
 screw_padim_wide_resnet50_2_s256_d200_nall,scratch_head,24,0.8482,0.0189,3

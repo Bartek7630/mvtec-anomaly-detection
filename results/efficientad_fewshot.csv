@@ -1,0 +1,2 @@
+data,category,model,backbone,layers,image_size,coreset_ratio,num_neighbors,epochs,steps,seed,val_split,n_train,n_test_images,image_AUROC,image_F1Score,pixel_AUROC,pixel_AUPRO,pixel_F1Score,fit_s,test_s
+MVTecAD,screw,efficientad,pdn_s,pdn,256,,,1400,70000.0,42,same_as_test,50,160,0.8297,0.8897,0.9777,0.9318,0.3486,7896.0,21.7

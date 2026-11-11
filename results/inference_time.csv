@@ -1,0 +1,9 @@
+date,model,device,gpu,torch,batch_size,warmup,runs,median_ms_per_image,mean_ms_per_image,p95_ms_per_image,images_per_s,note
+2026-11-11T11:18:58,efficientad,cuda,NVIDIA GeForce RTX 4060 Laptop GPU,2.14.1+cu126,1,20,100,12.405,12.492,12.977,80.6,untrained weights (speed does not depend on weights)
+2026-11-11T11:19:15,efficientad,cuda,NVIDIA GeForce RTX 4060 Laptop GPU,2.14.1+cu126,16,20,100,8.843,8.875,9.071,113.1,untrained weights (speed does not depend on weights)
+2026-11-11T11:19:18,stfpm,cuda,NVIDIA GeForce RTX 4060 Laptop GPU,2.14.1+cu126,1,20,100,10.05,10.453,13.156,99.5,untrained weights (speed does not depend on weights)
+2026-11-11T11:19:20,stfpm,cuda,NVIDIA GeForce RTX 4060 Laptop GPU,2.14.1+cu126,16,20,100,1.161,1.171,1.217,861.6,untrained weights (speed does not depend on weights)
+2026-11-11T11:19:48,padim,cuda,NVIDIA GeForce RTX 4060 Laptop GPU,2.14.1+cu126,1,20,100,4.702,4.817,5.284,212.7,fitted on 320 training images
+2026-11-11T11:19:50,padim,cuda,NVIDIA GeForce RTX 4060 Laptop GPU,2.14.1+cu126,16,20,100,1.026,1.028,1.047,974.7,fitted on 320 training images
+2026-11-11T11:20:31,patchcore,cuda,NVIDIA GeForce RTX 4060 Laptop GPU,2.14.1+cu126,1,20,100,12.566,12.927,14.614,79.6,fitted on 320 training images
+2026-11-11T11:20:41,patchcore,cuda,NVIDIA GeForce RTX 4060 Laptop GPU,2.14.1+cu126,16,20,100,5.173,5.167,5.266,193.3,fitted on 320 training images

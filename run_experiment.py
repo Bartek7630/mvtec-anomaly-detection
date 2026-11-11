@@ -1,4 +1,4 @@
-"""Run PatchCore / PaDiM / STFPM (anomalib) on one MVTec AD category and append the metrics to a CSV file."""
+"""Run PatchCore / PaDiM / STFPM / EfficientAD (anomalib) on one MVTec AD category and append the metrics to a CSV file."""
 
 import argparse
 import csv
@@ -17,24 +17,32 @@ from anomalib.metrics import AUROC, AUPRO, F1Score, Evaluator
 from anomalib.data import Folder
 from anomalib.data.utils import ValSplitMode
 from anomalib.engine import Engine
-from anomalib.models import Padim, Patchcore, Stfpm
+from anomalib.models import Padim, Patchcore, Stfpm, EfficientAd
 
 CSV_COLUMNS = [
     "data", "category", "model", "backbone", "layers", "image_size", "coreset_ratio",
-    "num_neighbors", "epochs", "steps", "seed", "n_train", "n_test_images",
+    "num_neighbors", "epochs", "steps", "seed", "val_split", "n_train", "n_test_images",
     "image_AUROC", "image_F1Score", "pixel_AUROC", "pixel_AUPRO", "pixel_F1Score", "fit_s", "test_s",
 ]
 
 
-TRAIN_BATCH = 16     # training batch size; the number of steps per epoch is ceil(images / TRAIN_BATCH)
+TRAIN_BATCH = 16     # training batch size (PatchCore, PaDiM, STFPM); steps per epoch = ceil(images / TRAIN_BATCH)
+EFFICIENTAD_STEPS = 70_000   # training steps in the EfficientAD paper (batch size 1)
+EFFICIENTAD_VAL_RATIO = 0.1  # share of the training images used for the map-normalisation quantiles (--val-split from_train)
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".bmp"}
 
 
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--root", required=True, help="path to one MVTec AD category folder, e.g. data/mvtec/screw")
-    p.add_argument("--category", default="screw", help="category name (used for labelling only)")
-    p.add_argument("--model", choices=["patchcore", "padim", "stfpm"], default="patchcore")
+    p.add_argument("--category", default="screw", help="category name")
+    p.add_argument("--model", choices=["patchcore", "padim", "stfpm", "efficientad"], default="patchcore")
+    p.add_argument("--efficientad-modelsize", default="s", choices=["s", "m"], help="EfficientAD: size of teacher and student")
+    p.add_argument("--imagenet-dir", default="datasets/imagenette",
+                   help="EfficientAD: folder with ImageNette")
+    p.add_argument("--val-split", choices=["auto", "same_as_test", "from_train"], default="auto",
+                   help="where the validation images come from. auto = same_as_test for PatchCore/PaDiM/STFPM (unchanged) and "
+                        "from_train for EfficientAD (10%% of the good training images; see the note in the README)")
     p.add_argument("--backbone", default=None,
                    help="default: wide_resnet50_2 for patchcore, resnet18 for padim, resnet18 for stfpm")
     p.add_argument("--n-features", type=int, default=None, help="PaDiM only: number of randomly selected channels")
@@ -50,26 +58,41 @@ def parse_args():
     p.add_argument("--scores-dir", default="scores", help="folder for the per-image score files")
     p.add_argument("--no-pretrained", action="store_true", help="random backbone weights (smoke tests only)")
     p.add_argument("--n-train", type=int, default=None, help="few-shot: randomly sample this many training images per seed")
-    p.add_argument("--epochs", type=int, default=100, help="STFPM only: number of training epochs (the paper uses 100)")
+    p.add_argument("--epochs", type=int, default=None,
+                   help="STFPM / EfficientAD: number of training epochs (default: 100 for STFPM, as in the paper; for EfficientAD 70000 steps)")
     p.add_argument("--iterations", type=int, default=None,
-                   help="STFPM only: target number of training steps. The number of epochs is then computed as "
-                        "ceil(iterations / ceil(n_images / 16)) and overrides --epochs, so that runs with different "
-                        "numbers of training images get the same number of steps (100 epochs on 320 images = 2000 steps)")
+                   help="STFPM / EfficientAD: target number of training steps. The number of epochs is then computed as "
+                        "ceil(iterations / steps_per_epoch) and overrides --epochs (STFPM: steps_per_epoch = ceil(n_images / 16), "
+                        "100 epochs on 320 images = 2000 steps; EfficientAD: batch size 1, so steps_per_epoch = n_images)")
     p.add_argument("--val-every", type=int, default=None,
-                   help="STFPM only: validate every N epochs (default: only after the last epoch, which saves time)")
+                   help="STFPM / EfficientAD: validate every N epochs (default: only after the last epoch, which saves time)")
     args = p.parse_args()
-    if args.model == "stfpm" and args.no_pretrained:
-        p.error("--no-pretrained is not supported for stfpm (its teacher is always pretrained)")
-    if args.epochs < 1:
+    trained = args.model in ("stfpm", "efficientad")
+    if trained and args.no_pretrained:
+        p.error(f"--no-pretrained is not supported for {args.model} (its teacher is always pretrained)")
+    if args.model == "efficientad" and args.backbone is not None:
+        p.error("--backbone is not used by efficientad (use --efficientad-modelsize)")
+    if args.epochs is not None and args.epochs < 1:
         p.error("--epochs must be >= 1")
-    if args.iterations is not None and (args.model != "stfpm" or args.iterations < 1):
-        p.error("--iterations needs --model stfpm and a value >= 1")
+    if args.iterations is not None and (not trained or args.iterations < 1):
+        p.error("--iterations needs --model stfpm or efficientad and a value >= 1")
+    if args.model == "stfpm" and args.epochs is None and args.iterations is None:
+        args.epochs = 100
+    if args.model == "efficientad" and args.epochs is None and args.iterations is None:
+        args.iterations = EFFICIENTAD_STEPS
+    if args.epochs is None:
+        args.epochs = 1
+    if args.val_split == "auto":
+        args.val_split = "from_train" if args.model == "efficientad" else "same_as_test"
+    if args.model == "efficientad" and args.n_train is not None and args.val_split == "from_train":
+        p.error("--n-train with efficientad needs --val-split same_as_test (the validation images are taken from the training images)")
     if args.n_train is not None and args.n_train < 1:
         p.error("--n-train must be >= 1")
     if args.model == "padim" and args.n_train == 1:
         p.error("PaDiM needs at least 2 training images")
     if args.backbone is None:
-        args.backbone = "wide_resnet50_2" if args.model == "patchcore" else "resnet18"
+        args.backbone = ("wide_resnet50_2" if args.model == "patchcore"
+                         else f"pdn_{args.efficientad_modelsize}" if args.model == "efficientad" else "resnet18")
     return args
 
 
@@ -112,7 +135,7 @@ def scores_file(args, seed):
         parts.append(f"cr{args.coreset_ratio}")
     elif args.n_features:
         parts.append(f"d{args.n_features}")
-    if args.model == "stfpm":
+    if args.model in ("stfpm", "efficientad"):
         parts.append(f"e{args.epochs}")
     parts += [f"n{args.n_train or 'all'}", f"seed{seed}"]
     return Path(args.scores_dir) / ("_".join(parts) + ".csv")
@@ -182,10 +205,11 @@ def _run(args, seed, normal_dir):
         abnormal_dir=abnormal_dir,
         normal_test_dir="test/good",
         mask_dir=mask_dir,
-        val_split_mode=ValSplitMode.SAME_AS_TEST,
+        val_split_mode=ValSplitMode.FROM_TRAIN if args.val_split == "from_train" else ValSplitMode.SAME_AS_TEST,
+        val_split_ratio=EFFICIENTAD_VAL_RATIO if args.val_split == "from_train" else 0.5,
         seed=seed,
         num_workers=0,
-        train_batch_size=TRAIN_BATCH,
+        train_batch_size=1 if args.model == "efficientad" else TRAIN_BATCH,
         eval_batch_size=16,
     )
 
@@ -197,7 +221,7 @@ def _run(args, seed, normal_dir):
         F1Score(fields=["pred_mask", "gt_mask"], prefix="pixel_", strict=False),
     ])
 
-    model_cls = Patchcore if args.model == "patchcore" else Stfpm if args.model == "stfpm" else Padim
+    model_cls = {"patchcore": Patchcore, "stfpm": Stfpm, "padim": Padim, "efficientad": EfficientAd}[args.model]
     pre_processor = True if args.image_size == 256 else model_cls.configure_pre_processor(
         image_size=(args.image_size, args.image_size))
     if args.model == "patchcore":
@@ -217,12 +241,19 @@ def _run(args, seed, normal_dir):
             pre_processor=pre_processor,
             evaluator=evaluator,
         )
-    else:
+    elif args.model == "padim":
         model = Padim(
             backbone=args.backbone,
             layers=["layer1", "layer2", "layer3"],
             pre_trained=not args.no_pretrained,
             n_features=args.n_features,
+            pre_processor=pre_processor,
+            evaluator=evaluator,
+        )
+    else:
+        model = EfficientAd(
+            imagenet_dir=args.imagenet_dir,
+            model_size={"s": "small", "m": "medium"}[args.efficientad_modelsize],
             pre_processor=pre_processor,
             evaluator=evaluator,
         )
@@ -232,14 +263,20 @@ def _run(args, seed, normal_dir):
         folder = Path(normal_dir) if Path(normal_dir).is_absolute() else root / normal_dir
         n_images = sum(1 for f in Path(folder).iterdir() if f.suffix.lower() in IMAGE_SUFFIXES)
         steps_per_epoch = math.ceil(n_images / TRAIN_BATCH)
+    elif args.model == "efficientad":
+        datamodule.setup("fit")
+        n_images = len(datamodule.train_data)
+        steps_per_epoch = n_images
+    if steps_per_epoch:
         if args.iterations:
             args.epochs = math.ceil(args.iterations / steps_per_epoch)
-        print(f"STFPM: {n_images} training images, {steps_per_epoch} steps per epoch, {args.epochs} epochs "
+        print(f"{args.model}: {n_images} training images, {steps_per_epoch} steps per epoch, {args.epochs} epochs "
               f"= {args.epochs * steps_per_epoch} steps")
-    if args.model == "stfpm":
-        # anomalib sets no max_epochs for STFPM (Lightning would then train for 1000 epochs), so set it explicitly
+        val_every = args.val_every or args.epochs
+        if args.epochs % val_every != 0 and args.model == "efficientad":
+            raise SystemExit(f"--val-every {val_every} does not divide the {args.epochs} epochs: the last epoch would not be validated")
         engine = Engine(accelerator=args.accelerator, default_root_dir=args.results_dir, max_epochs=args.epochs,
-                        check_val_every_n_epoch=args.val_every or args.epochs)
+                        check_val_every_n_epoch=val_every)
     else:
         engine = Engine(accelerator=args.accelerator, default_root_dir=args.results_dir)
 
@@ -261,13 +298,13 @@ def _run(args, seed, normal_dir):
 
     return {
         "data": "MVTecAD", "category": args.category, "model": args.model, "backbone": args.backbone,
-        "layers": "layer2+layer3" if args.model == "patchcore" else (
+        "layers": "layer2+layer3" if args.model == "patchcore" else "pdn" if args.model == "efficientad" else (
             "layer1+layer2+layer3" + (f" d={args.n_features}" if args.n_features else "")),
         "image_size": args.image_size,
         "coreset_ratio": args.coreset_ratio if args.model == "patchcore" else None,
         "num_neighbors": args.num_neighbors if args.model == "patchcore" else None,
-        "epochs": args.epochs if args.model == "stfpm" else None,
-        "steps": args.epochs * steps_per_epoch if args.model == "stfpm" else None, "seed": seed,
+        "epochs": args.epochs if steps_per_epoch else None,
+        "steps": args.epochs * steps_per_epoch if steps_per_epoch else None, "seed": seed, "val_split": args.val_split,
         "n_train": len(datamodule.train_data), "n_test_images": len(datamodule.test_data),
         "image_AUROC": metrics.get("image_AUROC"), "image_F1Score": metrics.get("image_F1Score"),
         "pixel_AUROC": metrics.get("pixel_AUROC"), "pixel_AUPRO": metrics.get("pixel_AUPRO"),

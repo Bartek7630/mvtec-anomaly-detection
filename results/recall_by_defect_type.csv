@@ -1,4 +1,9 @@
 method,defect_type,n_defective,found,recall,threshold
+screw_efficientad_pdn_s_s256_e244_nall,manipulated_front,24,24,1.0,0.1901
+screw_efficientad_pdn_s_s256_e244_nall,scratch_head,24,24,1.0,0.1901
+screw_efficientad_pdn_s_s256_e244_nall,scratch_neck,25,25,1.0,0.1901
+screw_efficientad_pdn_s_s256_e244_nall,thread_side,23,16,0.6957,0.1901
+screw_efficientad_pdn_s_s256_e244_nall,thread_top,23,23,1.0,0.1901
 screw_padim_wide_resnet50_2_s256_d200_nall,manipulated_front,24,19,0.7917,0.642
 screw_padim_wide_resnet50_2_s256_d200_nall,scratch_head,24,12,0.5,0.642
 screw_padim_wide_resnet50_2_s256_d200_nall,scratch_neck,25,19,0.76,0.642

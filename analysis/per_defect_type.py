@@ -9,6 +9,7 @@ Output: results/auroc_by_defect_type.csv   AUROC "good vs one defect type" for e
         figures/auroc_by_defect_type.png   bar chart
         figures/missed_<method>.png        the most missed images with their ground-truth mask (needs --root)
 
+
 """
 
 import argparse
@@ -23,7 +24,7 @@ from sklearn.metrics import roc_auc_score
 
 ROOT_REPO = Path(__file__).resolve().parents[1]
 SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e6e5e1"
-COLORS = {"patchcore": "#d9822b", "yolo": "#2a78d6", "padim": "#8a8984", "stfpm": "#2a9d8f"}
+COLORS = {"patchcore": "#d9822b", "yolo": "#2a78d6", "padim": "#8a8984", "stfpm": "#2a9d8f", "efficientad": "#a23b72"}
 
 
 def parse_args():
@@ -31,7 +32,7 @@ def parse_args():
     p.add_argument("--root", default=None, help="MVTec AD category folder (for the pictures of missed images)")
     p.add_argument("--scores-dir", default=str(ROOT_REPO / "scores"))
     p.add_argument("--folds", default=str(ROOT_REPO / "splits" / "screw_folds.csv"))
-    p.add_argument("--methods", nargs="+", default=["patchcore", "padim", "stfpm", "yolov8s_img640"],
+    p.add_argument("--methods", nargs="+", default=["patchcore", "padim", "stfpm", "efficientad", "yolov8s_img640"],
                    help="a score file is used if its method name contains one of these words")
     p.add_argument("--good-kept", type=float, default=0.95, help="share of good images that must stay below the threshold")
     p.add_argument("--n-missed", type=int, default=2, help="how many most-missed images to draw per method")
@@ -65,6 +66,8 @@ def short_name(method: str) -> str:
         return "padim"
     if "stfpm" in method:
         return "stfpm"
+    if "efficientad" in method:
+        return "efficientad"
     if "yolo" in method:
         return "yolo " + method.split("_img")[-1].split("_")[0] + " px"
     return method
@@ -121,7 +124,7 @@ def plot_auroc(table: pd.DataFrame, types: list, out: Path):
     labels = [f"{t}\n(n={int(table[(table.defect_type == t)]['n_defective'].iloc[0])})" for t in types]
     labels.append(f"all defects\n(n={int(table[table.defect_type == 'ALL DEFECTS']['n_defective'].iloc[0])})")
     width = 0.8 / len(methods)
-    fig, ax = plt.subplots(figsize=(9.2, 4.8), facecolor=SURFACE)
+    fig, ax = plt.subplots(figsize=(9.2 + 0.9 * max(0, len(methods) - 4), 4.8), facecolor=SURFACE)
     ax.set_facecolor(SURFACE)
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)

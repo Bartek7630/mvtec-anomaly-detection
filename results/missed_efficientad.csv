@@ -1,0 +1,8 @@
+path,defect_type,score,threshold
+test/thread_side/004.png,thread_side,0.0,0.190072
+test/thread_side/009.png,thread_side,0.0,0.190072
+test/thread_side/012.png,thread_side,0.0,0.190072
+test/thread_side/018.png,thread_side,0.0,0.190072
+test/thread_side/019.png,thread_side,0.0,0.190072
+test/thread_side/000.png,thread_side,0.093413,0.190072
+test/thread_side/020.png,thread_side,0.099252,0.190072
