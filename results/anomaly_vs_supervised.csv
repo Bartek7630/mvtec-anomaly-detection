@@ -9,6 +9,8 @@ N,mean,std,n_runs,method
 10,0.5097,0.024,3,STFPM (N good images)
 50,0.6397,0.1462,3,STFPM (N good images)
 320,0.7929,0.0872,3,STFPM (N good images)
+50,0.8297,,1,"EfficientAD (N good images, 1 run)"
+288,0.9654,,1,"EfficientAD (N good images, 1 run)"
 5,0.6639,0.0663,12,YOLOv8s (N defective images)
 10,0.791,0.0335,12,YOLOv8s (N defective images)
 20,0.814,0.0408,12,YOLOv8s (N defective images)

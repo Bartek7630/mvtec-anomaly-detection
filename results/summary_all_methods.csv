@@ -1,0 +1,6 @@
+method,runs,train_images,image_AUROC,pixel_AUROC,train_time_s,ms_per_image
+PatchCore,3 seeds,320,0.960 ± 0.013,0.981 ± 0.001,37,12.6
+PaDiM,3 seeds,320,0.829 ± 0.022,0.975 ± 0.001,38,4.7
+STFPM,3 seeds,320,0.793 ± 0.087,-,139-970 (few-shot runs; full run not saved),10.1
+EfficientAD (S),1 run,288,0.965,0.962,7598,12.4
+"YOLOv8s, 640 px (supervised)",4 folds,~120 (~90 defective),0.908 ± 0.039,0.978 ± 0.008 †,-,-

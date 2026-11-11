@@ -1,8 +1,10 @@
-"""One figure that answers the thesis question - anomaly detection vs supervised YOLO.
+"""Day 12.11: one figure that answers the thesis question - anomaly detection vs supervised YOLO.
 
 Input : results/few_shot.csv           PatchCore, N GOOD images (seeds 1, 2, 42), test = all 160 test images
         results/stfpm_fewshot.csv      STFPM, N GOOD images (same seeds and draws), 2000 training steps
         results/stfpm_screw.csv        STFPM trained on all 320 good images (100 epochs = 2000 steps)
+        results/efficientad_fewshot.csv  EfficientAD, N = 50 good images, ONE draw (seed 42), 70 000 steps
+        results/efficientad_screw.csv    EfficientAD trained on 288 good images (the other 10% = validation), ONE run
         results/yolo_fewshot.csv       YOLO, N DEFECTIVE images (3 seeds x 4 folds), test = the held-out fold
         results/yolo_folds.csv         YOLO trained on all defective images (imgsz 640), 1 training per fold
         results/folds_summary.csv      PaDiM, full data, per fold (horizontal line)
@@ -23,7 +25,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 RES, FIG = ROOT / "results", ROOT / "figures"
 SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e6e5e1"
-BLUE, ORANGE, GREY, TEAL = "#2a78d6", "#d9822b", "#8a8984", "#2a9d8f"
+BLUE, ORANGE, GREY, TEAL, MAGENTA = "#2a78d6", "#d9822b", "#8a8984", "#2a9d8f", "#a23b72"
 
 
 def patchcore_curve() -> pd.DataFrame:
@@ -48,6 +50,17 @@ def stfpm_curve() -> pd.DataFrame:
     return out
 
 
+def efficientad_points() -> pd.DataFrame:
+    """EfficientAD: single runs only (seed 42), so there is no std. N = 50 and the full run (288 good images + 32 held out)."""
+    few = pd.read_csv(RES / "efficientad_fewshot.csv")
+    full = pd.read_csv(RES / "efficientad_screw.csv")
+    df = pd.concat([few[few["n_train"] == 50], full[full["n_train"] > 100]])
+    assert len(df) == 2 and (df["seed"] == 42).all(), df
+    out = pd.DataFrame({"mean": df["image_AUROC"].to_numpy(), "std": np.nan, "n_runs": 1}, index=df["n_train"].to_numpy())
+    out.index.name = "n_train"
+    return out
+
+
 def yolo_curve() -> pd.DataFrame:
     """Mean over seeds inside each fold, then mean and std (n - 1) across the 4 folds; plus the all-data point."""
     few = pd.read_csv(RES / "yolo_fewshot.csv")
@@ -62,11 +75,12 @@ def yolo_curve() -> pd.DataFrame:
 
 
 def main():
-    pc, yo, st = patchcore_curve(), yolo_curve(), stfpm_curve()
+    pc, yo, st, ea = patchcore_curve(), yolo_curve(), stfpm_curve(), efficientad_points()
     padim = pd.read_csv(RES / "folds_summary.csv").set_index("method").filter(like="padim", axis=0).iloc[0]
     padim_mean = float(padim["mean"])
 
     table = pd.concat([pc.assign(method="PatchCore (N good images)"), st.assign(method="STFPM (N good images)"),
+                       ea.assign(method="EfficientAD (N good images, 1 run)"),
                        yo.assign(method="YOLOv8s (N defective images)")])
     table.index.name = "N"
     table.round(4).to_csv(RES / "anomaly_vs_supervised.csv")
@@ -95,8 +109,16 @@ def main():
         ax.plot(x, m, color=color, lw=2, zorder=4)
         ax.errorbar(x, m, yerr=s, fmt="o", color=color, ms=7, capsize=3, lw=1.4, mec=SURFACE, mew=1.4, zorder=5, label=name)
 
+    # EfficientAD: one run per point -> no error bars, hollow-centre markers, thin line
+    xe, me = ea.index.to_numpy(float) * 1.06, ea["mean"].to_numpy()   # shifted right of PatchCore so the markers do not hide each other
+    ax.plot(xe, me, color=MAGENTA, lw=1.4, ls=(0, (5, 2)), zorder=4)
+    ax.plot(xe, me, "D", color=MAGENTA, ms=8, mec=SURFACE, mew=1.4, zorder=5,
+            label="EfficientAD (anomaly detection, trained): N GOOD images, 1 run (no error bar)")
+
     # direct labels at the right end of each curve
-    ax.annotate(f"{pc['mean'].iloc[-1]:.3f}", (320 * 0.9, pc["mean"].iloc[-1]), xytext=(8, 0), textcoords="offset points",
+    ax.annotate(f"EfficientAD {me[-1]:.3f}", (xe[-1], me[-1]), xytext=(10, 9), textcoords="offset points",
+                fontsize=9, color=INK, va="center")
+    ax.annotate(f"{pc['mean'].iloc[-1]:.3f}", (320 * 0.9, pc["mean"].iloc[-1]), xytext=(8, -9), textcoords="offset points",
                 fontsize=9, color=INK, va="center")
     ax.annotate(f"{st['mean'].iloc[-1]:.3f}", (320, st["mean"].iloc[-1]), xytext=(8, 0), textcoords="offset points",
                 fontsize=9, color=INK, va="center")
@@ -111,15 +133,16 @@ def main():
     ax.set_xlabel("N = number of training images (log scale) - GOOD for PatchCore, DEFECTIVE for YOLO", fontsize=9, color=INK2)
     ax.set_ylabel("image AUROC", fontsize=9, color=INK2)
     ax.tick_params(colors=INK2)
-    ax.set_title("MVTec AD 'screw': anomaly detection vs supervised detection", loc="left", fontsize=12, color=INK, pad=48)
-    ax.legend(frameon=False, fontsize=8.5, loc="upper left", bbox_to_anchor=(0, 1.2))
+    ax.set_title("MVTec AD 'screw': anomaly detection vs supervised detection", loc="left", fontsize=12, color=INK, pad=62)
+    ax.legend(frameon=False, fontsize=8.5, loc="upper left", bbox_to_anchor=(0, 1.27))
     fig.text(0.01, 0.012,
              "The X axis counts two DIFFERENT kinds of images: good ones for PatchCore, defective ones for YOLO (YOLO also sees up to ~30 good ones).\n"
              "Same 160 test images for both: PatchCore scores them with one model, YOLO fold by fold (4 models x 40 held-out images, AUROC averaged).\n"
              "Points = mean, bars/bands = std (PatchCore, STFPM: 3 draws of the training images; YOLO: 4 folds); curves are shifted sideways for readability.\n"
-             "PatchCore and STFPM use the same protocol and the same draws, so they can be compared point by point; YOLO cannot.",
+             "PatchCore and STFPM use the same protocol and the same draws, so they can be compared point by point; YOLO cannot.\n"
+             "EfficientAD: one run only (seed 42); N = 50 uses the test set for normalisation statistics, the full run (288 images) a 10% validation split.",
              fontsize=7.4, color=INK2, va="bottom")
-    fig.tight_layout(rect=[0, 0.12, 1, 1])
+    fig.tight_layout(rect=[0, 0.15, 1, 1])
     fig.savefig(FIG / "anomaly_vs_supervised.png", dpi=150, facecolor=SURFACE)
     print("Saved", RES / "anomaly_vs_supervised.csv", "and", FIG / "anomaly_vs_supervised.png")
 
