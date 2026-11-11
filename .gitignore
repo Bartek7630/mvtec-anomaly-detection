@@ -13,4 +13,4 @@ results_backup_*.csv
 .DS_Store
 yolo_data/
 scores_yolo/
-*.pt
+*.ptdatasets/
