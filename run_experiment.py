@@ -17,7 +17,19 @@ from anomalib.metrics import AUROC, AUPRO, F1Score, Evaluator
 from anomalib.data import Folder
 from anomalib.data.utils import ValSplitMode
 from anomalib.engine import Engine
-from anomalib.models import Padim, Patchcore, Stfpm, EfficientAd
+from anomalib.models import Padim, Patchcore, Stfpm, EfficientAd, WinClip
+
+
+def _collect_reference_images_fixed(self, dataloader):
+    images = []
+    for item in dataloader.dataset:
+        images.append(item.image.unsqueeze(0))
+        if len(images) == self.k_shot:
+            break
+    return torch.cat(images)
+
+
+WinClip.collect_reference_images = _collect_reference_images_fixed
 
 CSV_COLUMNS = [
     "data", "category", "model", "backbone", "layers", "image_size", "coreset_ratio",
@@ -36,8 +48,9 @@ def parse_args():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--root", required=True, help="path to one MVTec AD category folder, e.g. data/mvtec/screw")
     p.add_argument("--category", default="screw", help="category name")
-    p.add_argument("--model", choices=["patchcore", "padim", "stfpm", "efficientad"], default="patchcore")
+    p.add_argument("--model", choices=["patchcore", "padim", "stfpm", "efficientad", "winclip"], default="patchcore")
     p.add_argument("--efficientad-modelsize", default="s", choices=["s", "m"], help="EfficientAD: size of teacher and student")
+    p.add_argument("--k-shot", type=int, default=0, help="WinClip: number of shots to use for training (0 means no shots)")
     p.add_argument("--imagenet-dir", default="datasets/imagenette",
                    help="EfficientAD: folder with ImageNette")
     p.add_argument("--val-split", choices=["auto", "same_as_test", "from_train"], default="auto",
@@ -86,13 +99,29 @@ def parse_args():
         args.val_split = "from_train" if args.model == "efficientad" else "same_as_test"
     if args.model == "efficientad" and args.n_train is not None and args.val_split == "from_train":
         p.error("--n-train with efficientad needs --val-split same_as_test (the validation images are taken from the training images)")
+    if args.model == "winclip":
+        if args.k_shot == 0 and args.n_train is not None:
+            p.error("--n-train for winclip needs --k-shot N (with --k-shot 0 the model sees no training images)")
+        if args.k_shot > 0:
+            if args.n_train is None:
+                args.n_train = args.k_shot
+            elif args.n_train != args.k_shot:
+                p.error(f"--n-train ({args.n_train}) must match --k-shot ({args.k_shot}) for winclip")
+        elif args.k_shot < 0:
+            p.error("--k-shot must be >= 0")
+        if args.image_size == 256:
+            args.image_size = 240
     if args.n_train is not None and args.n_train < 1:
         p.error("--n-train must be >= 1")
     if args.model == "padim" and args.n_train == 1:
         p.error("PaDiM needs at least 2 training images")
     if args.backbone is None:
-        args.backbone = ("wide_resnet50_2" if args.model == "patchcore"
-                         else f"pdn_{args.efficientad_modelsize}" if args.model == "efficientad" else "resnet18")
+        args.backbone = (
+            "wide_resnet50_2" if args.model == "patchcore"
+            else f"pdn_{args.efficientad_modelsize}" if args.model == "efficientad"
+            else "ViT-B-16-plus-240" if args.model == "winclip"
+            else "resnet18"
+        )
     return args
 
 
@@ -137,7 +166,8 @@ def scores_file(args, seed):
         parts.append(f"d{args.n_features}")
     if args.model in ("stfpm", "efficientad"):
         parts.append(f"e{args.epochs}")
-    parts += [f"n{args.n_train or 'all'}", f"seed{seed}"]
+    n_str = "0" if (args.model == "winclip" and args.k_shot == 0) else (args.n_train or "all")
+    parts += [f"n{n_str}", f"seed{seed}"]
     return Path(args.scores_dir) / ("_".join(parts) + ".csv")
 
 
@@ -221,9 +251,13 @@ def _run(args, seed, normal_dir):
         F1Score(fields=["pred_mask", "gt_mask"], prefix="pixel_", strict=False),
     ])
 
-    model_cls = {"patchcore": Patchcore, "stfpm": Stfpm, "padim": Padim, "efficientad": EfficientAd}[args.model]
-    pre_processor = True if args.image_size == 256 else model_cls.configure_pre_processor(
-        image_size=(args.image_size, args.image_size))
+    model_cls = {"patchcore": Patchcore, "stfpm": Stfpm, "padim": Padim, "efficientad": EfficientAd, "winclip":WinClip}[args.model]
+    if args.model == "winclip":
+        pre_processor = True
+    else:
+        pre_processor = True if args.image_size == 256 else model_cls.configure_pre_processor(
+            image_size=(args.image_size, args.image_size))
+
     if args.model == "patchcore":
         model = Patchcore(
             backbone=args.backbone,
@@ -250,13 +284,25 @@ def _run(args, seed, normal_dir):
             pre_processor=pre_processor,
             evaluator=evaluator,
         )
-    else:
+    elif args.model == "efficientad":
         model = EfficientAd(
             imagenet_dir=args.imagenet_dir,
             model_size={"s": "small", "m": "medium"}[args.efficientad_modelsize],
             pre_processor=pre_processor,
             evaluator=evaluator,
         )
+    elif args.model == "winclip":
+        ref_source = str(Path(normal_dir) if Path(normal_dir).is_absolute() else root / normal_dir) if args.k_shot > 0 else None
+        model = WinClip(
+            class_name=args.category,
+            k_shot=args.k_shot,
+            few_shot_source=ref_source,
+            pre_processor=pre_processor,
+            evaluator=evaluator,
+        )
+        if not hasattr(model.pre_processor, "test_transform"):
+            object.__setattr__(model.pre_processor, "test_transform", model.pre_processor.transform)
+        
 
     steps_per_epoch = None
     if args.model == "stfpm":
@@ -280,9 +326,11 @@ def _run(args, seed, normal_dir):
     else:
         engine = Engine(accelerator=args.accelerator, default_root_dir=args.results_dir)
 
-    t0 = time.time()
-    engine.fit(model=model, datamodule=datamodule)
-    t_fit = time.time() - t0
+    t_fit = 0.0
+    if args.model != "winclip":
+        t0 = time.time()
+        engine.fit(model=model, datamodule=datamodule)
+        t_fit = time.time() - t0
 
     t0 = time.time()
     metrics = engine.test(model=model, datamodule=datamodule)[0]
@@ -293,19 +341,24 @@ def _run(args, seed, normal_dir):
         if args.save_scores:
             save_scores(items, scores_file(args, seed))
         if args.save_errors:
-            name = f"errors_{args.model}_{args.backbone}_{args.image_size}_n{args.n_train or 'all'}_seed{seed}.png"
+            n_str = "0" if (args.model == "winclip" and args.k_shot == 0) else (args.n_train or "all")
+            name = f"errors_{args.model}_{args.backbone}_{args.image_size}_n{n_str}_seed{seed}.png"
             save_error_cases(items, Path(args.results_dir) / name)
 
     return {
         "data": "MVTecAD", "category": args.category, "model": args.model, "backbone": args.backbone,
-        "layers": "layer2+layer3" if args.model == "patchcore" else "pdn" if args.model == "efficientad" else (
-            "layer1+layer2+layer3" + (f" d={args.n_features}" if args.n_features else "")),
+        "layers": (
+            "layer2+layer3" if args.model == "patchcore"
+            else "pdn" if args.model == "efficientad"
+            else "clip" if args.model == "winclip"
+            else ("layer1+layer2+layer3" + (f" d={args.n_features}" if args.n_features else ""))),
         "image_size": args.image_size,
         "coreset_ratio": args.coreset_ratio if args.model == "patchcore" else None,
         "num_neighbors": args.num_neighbors if args.model == "patchcore" else None,
         "epochs": args.epochs if steps_per_epoch else None,
         "steps": args.epochs * steps_per_epoch if steps_per_epoch else None, "seed": seed, "val_split": args.val_split,
-        "n_train": len(datamodule.train_data), "n_test_images": len(datamodule.test_data),
+        "n_train": 0 if (args.model == "winclip" and args.k_shot == 0) else len(datamodule.train_data),
+        "n_test_images": len(datamodule.test_data),
         "image_AUROC": metrics.get("image_AUROC"), "image_F1Score": metrics.get("image_F1Score"),
         "pixel_AUROC": metrics.get("pixel_AUROC"), "pixel_AUPRO": metrics.get("pixel_AUPRO"),
         "pixel_F1Score": metrics.get("pixel_F1Score"),

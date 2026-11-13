@@ -16,3 +16,7 @@ N,mean,std,n_runs,method
 20,0.814,0.0408,12,YOLOv8s (N defective images)
 50,0.8923,0.0372,12,YOLOv8s (N defective images)
 89,0.9076,0.0387,4,YOLOv8s (N defective images)
+0,0.7198,0.0,1,WinCLIP (N=0: zero-shot; N>0: reference good images)
+1,0.7436,0.0833,3,WinCLIP (N=0: zero-shot; N>0: reference good images)
+5,0.8188,0.014,3,WinCLIP (N=0: zero-shot; N>0: reference good images)
+10,0.8458,0.0309,3,WinCLIP (N=0: zero-shot; N>0: reference good images)
