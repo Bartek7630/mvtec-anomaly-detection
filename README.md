@@ -1,42 +1,72 @@
-# Visual anomaly detection with limited data: PatchCore, PaDiM and a supervised YOLOv8 baseline on MVTec AD
+# Visual anomaly detection with limited data: PatchCore, PaDiM, STFPM, EfficientAD, WinCLIP and a supervised YOLOv8 baseline on MVTec AD
 
-Small manufacturers rarely have thousands of labelled defect images. They usually have **some photos of good parts and almost no photos of defects**. This project studies how well two unsupervised anomaly-detection methods, **PatchCore** and **PaDiM**, work in that situation, and how performance changes when only a handful of good training images is available. A **supervised YOLOv8 detector**, trained on defect images with bounding boxes, serves as the baseline that answers the practical question: *when is it worth collecting labelled defects instead of using only good images?*
+Small manufacturers rarely have thousands of labelled defect images. They usually have **some photos of good parts and almost no photos of defects**. This project studies how well five methods that need no defect images work in that situation (**PatchCore, PaDiM, STFPM, EfficientAD** and the vision-language model **WinCLIP**), and how performance changes when only a handful of good images is available. A **supervised YOLOv8 detector**, trained on defect images with bounding boxes, serves as the baseline that answers the practical question: *when is it worth collecting labelled defects instead of using only good images?*
 
-It is the experimental part of my BSc thesis in Artificial Intelligence (Catholic University of Lublin). All results come from the scripts in this repository and are stored as CSV files in this repository.
+It is the experimental part of my BSc thesis in Artificial Intelligence (Catholic University of Lublin). All results come from the scripts in this repository and are stored as CSV files in this repository. PatchCore and PaDiM were run on all 15 MVTec AD categories; the other methods and the few-shot studies cover the category `screw`.
 
 ![Anomaly detection vs supervised YOLO](figures/anomaly_vs_supervised.png)
 
 ## Key findings
 
-1. **PatchCore beats PaDiM at image-level detection on the hard categories**, and the two are equal on the easy ones. On `screw`, image AUROC is 0.960 vs 0.829. On `transistor` it is 0.993 vs 0.948. On `bottle` both reach 1.000 and on `carpet` the difference is within noise.
-2. **Localisation is about equal.** Pixel AUPRO is within roughly 0.01 between the methods on all four categories.
-3. **Few-shot (`screw`, PatchCore):** with 1, 5 or 10 good training images image AUROC stays close to chance (0.49 / 0.55 / 0.60). At 50 images it jumps to 0.85, and with all 320 images it reaches 0.96.
-4. **Localisation needs fewer images than detection.** Pixel AUROC (0.981) and AUPRO (0.912) at N = 50 already match the full-data values, while image AUROC does not.
-5. **Image diversity matters more than memory-bank size.** With the same 50 images, shrinking the bank from 51,200 to 5,120 patches costs about 0.02 image AUROC. Yet the full-data model uses only 3,276 patches and scores 0.96. A bank of 512 patches is too small (0.76).
-6. **Supervised YOLOv8s does not beat PatchCore on `screw`.** Trained on about 90 defective images (plus about 30 good ones) and tested on held-out folds, it reaches image AUROC 0.908 (640 px) and 0.926 (1024 px), against 0.961 for PatchCore and 0.832 for PaDiM (means over 4 folds). The difference between the two YOLO image sizes is within noise.
-7. **YOLO needs defective examples and is unstable with few of them.** With N = 5 / 10 / 20 / 50 defective training images the image AUROC is 0.66 / 0.79 / 0.81 / 0.89. The gain flattens after 50 images, N = 10 vs 20 is within noise, and single trainings with the same N differ by 0.05-0.09 AUROC depending on which images were drawn.
-8. **The two few-shot curves cannot be compared point by point.** N counts good images for PatchCore and defective images for YOLO, and the two methods are trained on different data (see Limitations). The combined figure shows both curves for orientation only.
-9. **The methods fail on different defects.** `thread_side` is the hardest type for all three (image AUROC 0.917 PatchCore, 0.829 YOLO, 0.681 PaDiM). YOLO is clearly weaker than PatchCore on `manipulated_front` (0.811 vs 0.941) and at least as good on `scratch_head` (0.996 vs 0.970). No defective image is missed by PatchCore alone, and 10 of the 119 are missed by all three methods.
-10. **Image F1 can mislead.** 74% of the `screw` test images are defective, so predicting "defective" for everything already gives F1 = 0.853. Judge few-shot runs by AUROC.
+1. **PatchCore beats PaDiM at image-level detection, but only on objects.** Over all 15 categories the mean image AUROC is 0.983 (PatchCore) vs 0.930 (PaDiM). On the 5 texture categories both reach about 0.99 (0.992 vs 0.989). On the 10 object categories it is 0.978 vs 0.900, with the largest gaps on `hazelnut` (1.000 vs 0.820), `screw` (0.960 vs 0.829) and `cable` (0.986 vs 0.872). The grouping into textures and objects is mine; why objects are harder for PaDiM (it models each image position separately, so changes in pose hurt it) is an explanation I did not test.
+2. **Localisation is closer than detection.** Mean pixel AUPRO over 15 categories: 0.924 (PatchCore) vs 0.907 (PaDiM). PaDiM is better on `toothbrush` (0.915 vs 0.869) and about equal on `carpet`.
+3. **On `screw` with all training images, EfficientAD and PatchCore are the best** (image AUROC 0.965 from a single EfficientAD run, 0.960 ± 0.013 for PatchCore), ahead of supervised YOLOv8s (0.908 ± 0.039), PaDiM (0.829 ± 0.022) and STFPM (0.793 ± 0.087, very unstable across seeds). EfficientAD needs about 2 hours to train, PatchCore 37 seconds.
+4. **Few-shot with good images only (`screw`):** with 1, 5 or 10 good images PatchCore stays close to chance (0.49 / 0.55 / 0.60) and STFPM too (0.50 / 0.46 / 0.51). At 50 images PatchCore jumps to 0.85, STFPM reaches 0.64 and a single EfficientAD run 0.83.
+5. **WinCLIP needs no training and is the best method with very few images.** Zero-shot (no training image at all) its image AUROC is 0.720. With 1, 5 and 10 reference images it is 0.744 ± 0.083, 0.819 ± 0.014 and 0.846 ± 0.031, i.e. 10 good images give what PatchCore needs about 50 for. One reference image is unreliable (0.65 to 0.82 depending on which image is drawn). WinCLIP uses 240 px input and a text prompt, so it is not the same protocol as the other methods.
+6. **Localisation needs fewer images than detection.** For PatchCore, pixel AUROC (0.981) and AUPRO (0.912) at N = 50 already match the full-data values, while image AUROC does not.
+7. **Image diversity matters more than memory-bank size.** With the same 50 images, shrinking the PatchCore bank from 51,200 to 5,120 patches costs about 0.02 image AUROC. Yet the full-data model uses only 3,276 patches and scores 0.96. A bank of 512 patches is too small (0.76).
+8. **Supervised YOLOv8s does not beat PatchCore on `screw`.** Trained on about 90 defective images (plus about 30 good ones) and tested on held-out folds, it reaches image AUROC 0.908 (640 px) and 0.926 (1024 px), against 0.961 for PatchCore and 0.832 for PaDiM (means over 4 folds). The difference between the two YOLO image sizes is within noise.
+9. **YOLO needs defective examples and is unstable with few of them.** With N = 5 / 10 / 20 / 50 defective training images the image AUROC is 0.66 / 0.79 / 0.81 / 0.89. The gain flattens after 50 images, N = 10 vs 20 is within noise, and single trainings with the same N differ by 0.05-0.09 AUROC depending on which images were drawn.
+10. **The few-shot curves cannot be compared point by point across the two families.** N counts good images for PatchCore, STFPM, EfficientAD and WinCLIP and defective images for YOLO, and the methods are trained on different data (see Limitations). The combined figure shows all curves for orientation only. PatchCore, STFPM and WinCLIP use the same random draws of good images and can be compared with each other.
+11. **The methods fail on different defects.** `thread_side` is the hardest type for all three methods analysed in detail (image AUROC 0.917 PatchCore, 0.829 YOLO, 0.681 PaDiM). YOLO is clearly weaker than PatchCore on `manipulated_front` (0.811 vs 0.941) and at least as good on `scratch_head` (0.996 vs 0.970). WinCLIP zero-shot is at chance on `manipulated_front` (0.497) and reaches 0.73 there only with 10 reference images. No defective image is missed by PatchCore alone, and 10 of the 119 are missed by all three methods.
+12. **Image F1 can mislead.** 74% of the `screw` test images are defective, so predicting "defective" for everything already gives F1 = 0.853. Judge few-shot runs by AUROC.
 
 ## Results
 
-All numbers are mean ± standard deviation over 3 seeds (42, 1, 2), on the official MVTec AD test split. PatchCore: WideResNet-50 backbone, layers 2+3, 256 px, 1% coreset, 9 neighbours. PaDiM: WideResNet-50, layers 1+2+3, 200 random channels, 256 px.
+All numbers are mean ± standard deviation over 3 seeds (42, 1, 2), on the official MVTec AD test split, unless stated otherwise. PatchCore: WideResNet-50 backbone, layers 2+3, 256 px, 1% coreset, 9 neighbours. PaDiM: WideResNet-50, layers 1+2+3, 200 random channels, 256 px. STFPM: ResNet-18, 100 epochs. EfficientAD: small model (PDN-S), 70,000 steps. WinCLIP: CLIP ViT-B-16-plus-240, 240 px.
 
-### PatchCore vs PaDiM, four categories
+### PatchCore vs PaDiM, all 15 categories
 
-![Four categories](figures/four_categories.png)
+![All 15 categories](figures/fifteen_categories.png)
 
-| category | method | image AUROC | image F1 | pixel AUROC | pixel AUPRO | pixel F1 |
+Sorted by PatchCore image AUROC (hardest first). Every cell is mean ± std over 3 seeds (90 runs). All other metrics are in `results/fifteen_categories_table.csv` and `results_15.csv`.
+
+| category | PatchCore image AUROC | PaDiM image AUROC | PatchCore pixel AUPRO | PaDiM pixel AUPRO |
+|---|---|---|---|---|
+| toothbrush | 0.917 ± 0.017 | 0.876 ± 0.043 | 0.869 ± 0.003 | 0.915 ± 0.007 |
+| pill | 0.957 ± 0.003 | 0.906 ± 0.018 | 0.952 ± 0.001 | 0.925 ± 0.007 |
+| screw | 0.960 ± 0.013 | 0.829 ± 0.022 | 0.911 ± 0.004 | 0.906 ± 0.003 |
+| zipper | 0.980 ± 0.002 | 0.902 ± 0.027 | 0.934 ± 0.001 | 0.900 ± 0.020 |
+| grid | 0.985 ± 0.005 | 0.973 ± 0.006 | 0.899 ± 0.006 | 0.891 ± 0.018 |
+| cable | 0.986 ± 0.002 | 0.872 ± 0.015 | 0.922 ± 0.005 | 0.863 ± 0.016 |
+| carpet | 0.986 ± 0.002 | 0.990 ± 0.007 | 0.942 ± 0.003 | 0.948 ± 0.014 |
+| wood | 0.986 ± 0.001 | 0.990 ± 0.003 | 0.883 ± 0.002 | 0.869 ± 0.025 |
+| capsule | 0.991 ± 0.003 | 0.899 ± 0.003 | 0.930 ± 0.012 | 0.914 ± 0.002 |
+| transistor | 0.993 ± 0.001 | 0.948 ± 0.025 | 0.936 ± 0.002 | 0.925 ± 0.002 |
+| metal_nut | 0.999 ± 0.000 | 0.952 ± 0.029 | 0.943 ± 0.002 | 0.902 ± 0.007 |
+| bottle | 1.000 ± 0.000 | 1.000 ± 0.000 | 0.940 ± 0.003 | 0.934 ± 0.004 |
+| leather | 1.000 ± 0.000 | 1.000 ± 0.000 | 0.975 ± 0.000 | 0.975 ± 0.002 |
+| hazelnut | 1.000 ± 0.000 | 0.820 ± 0.060 | 0.954 ± 0.001 | 0.905 ± 0.008 |
+| tile | 1.000 ± 0.000 | 0.992 ± 0.006 | 0.863 ± 0.002 | 0.833 ± 0.017 |
+| **mean of 15** | **0.983 ± 0.001** | **0.930 ± 0.008** | **0.924 ± 0.001** | **0.907 ± 0.002** |
+
+PatchCore's mean image AUROC (0.983) is about 0.8 points below the roughly 99% reported in the original paper. Possible reasons, none of them tested: `toothbrush` (0.917) has only 42 test images, so its score is noisy and alone lowers the mean by about 0.005; a 1% coreset instead of a larger one; 256 px input without the crop used in the paper; and implementation details of `anomalib`. The AUROC for `bottle`, `leather`, `hazelnut` and `tile` is 1.000 for all three seeds.
+
+### All methods on `screw` (full training data)
+
+| method | runs | training images | image AUROC | pixel AUROC | training time [s] | model forward [ms/image] |
 |---|---|---|---|---|---|---|
-| screw | PatchCore | 0.960 ± 0.013 | 0.946 ± 0.003 | 0.981 ± 0.001 | 0.911 ± 0.004 | 0.370 ± 0.003 |
-| screw | PaDiM | 0.829 ± 0.022 | 0.888 ± 0.007 | 0.975 ± 0.001 | 0.906 ± 0.003 | 0.233 ± 0.009 |
-| bottle | PatchCore | 1.000 ± 0.000 | 0.992 ± 0.000 | 0.985 ± 0.000 | 0.940 ± 0.003 | 0.724 ± 0.001 |
-| bottle | PaDiM | 1.000 ± 0.000 | 0.992 ± 0.000 | 0.980 ± 0.001 | 0.934 ± 0.004 | 0.693 ± 0.007 |
-| transistor | PatchCore | 0.993 ± 0.001 | 0.945 ± 0.007 | 0.965 ± 0.001 | 0.936 ± 0.002 | 0.603 ± 0.006 |
-| transistor | PaDiM | 0.948 ± 0.025 | 0.856 ± 0.030 | 0.976 ± 0.002 | 0.925 ± 0.002 | 0.670 ± 0.016 |
-| carpet | PatchCore | 0.986 ± 0.002 | 0.972 ± 0.005 | 0.990 ± 0.000 | 0.942 ± 0.003 | 0.603 ± 0.002 |
-| carpet | PaDiM | 0.990 ± 0.007 | 0.979 ± 0.003 | 0.987 ± 0.004 | 0.948 ± 0.014 | 0.529 ± 0.063 |
+| PatchCore | 3 seeds | 320 | 0.960 ± 0.013 | 0.981 ± 0.001 | 37 | 12.6 |
+| PaDiM | 3 seeds | 320 | 0.829 ± 0.022 | 0.975 ± 0.001 | 38 | 4.7 |
+| STFPM | 3 seeds | 320 | 0.793 ± 0.087 | 0.946 ± 0.032 | 1243 | 10.1 |
+| EfficientAD (S) | 1 run | 288 | 0.965 | 0.962 | 7598 | 12.4 |
+| YOLOv8s, 640 px (supervised) | 4 folds | ~120 (~90 defective) | 0.908 ± 0.039 | 0.978 ± 0.008 † | - | - |
+| WinCLIP zero-shot | 1 run | 0 | 0.720 | 0.909 | 0 (no training) | - |
+| WinCLIP, 10 reference images | 3 draws | 10 | 0.846 ± 0.031 | 0.971 ± 0.005 | 0 (no training) | - |
+
+`±` = standard deviation over seeds (YOLO: over folds). EfficientAD: a single run, so no spread; 288 training images (10% held out for normalisation). WinCLIP uses 240 x 240 input and needs no training; the 10 reference images are drawn like the PatchCore few-shot images. `-` = not measured. † YOLO pixel AUROC comes from a sample of pixels and a map built from boxes: not comparable with the anomaly maps. Model forward = batch 1, RTX 4060 Laptop, fp32, 256 x 256 input, median of 100 runs, without reading files (`analysis/time_inference.py`); YOLO was not timed.
+
+STFPM is very unstable on `screw` (image AUROC 0.847 / 0.839 / 0.692 for seeds 42 / 1 / 2). EfficientAD was trained once because one run takes about 2 hours, so its 0.965 has no error bar and should not be read as better than PatchCore's 0.960.
 
 ### Few-shot experiment (`screw`, PatchCore)
 
@@ -59,6 +89,21 @@ The last row uses a different coreset size than the others. To check that this d
 | 100% | 51,200 | 0.845 ± 0.034 | 0.981 ± 0.003 | 0.912 ± 0.009 | 0.280 ± 0.067 |
 | 10% | 5,120 | 0.822 ± 0.035 | 0.980 ± 0.003 | 0.913 ± 0.009 | 0.275 ± 0.062 |
 | 1% | 512 | 0.758 ± 0.043 | 0.939 ± 0.016 | 0.802 ± 0.029 | 0.243 ± 0.051 |
+
+### Few-shot with good images: STFPM, EfficientAD and WinCLIP (`screw`)
+
+N good images are drawn at random with the same 3 draws as for PatchCore (seeds 42, 1, 2). STFPM trains for 2,000 steps for every N. EfficientAD was run once, for N = 50 only; its training takes the same 70,000 steps regardless of N, so about 2 hours, and its map normalisation statistics for this run come from the test set (a mild form of leakage, see Limitations). WinCLIP does not train: the N images are only used as references (N = 0 is zero-shot, one run, because nothing is random).
+
+| N good images | PatchCore | STFPM | EfficientAD | WinCLIP |
+|---|---|---|---|---|
+| 0 | - | - | - | 0.720 (1 run) |
+| 1 | 0.491 ± 0.038 | 0.496 ± 0.027 | - | 0.744 ± 0.083 |
+| 5 | 0.545 ± 0.017 | 0.464 ± 0.077 | - | 0.819 ± 0.014 |
+| 10 | 0.599 ± 0.054 | 0.510 ± 0.024 | - | 0.846 ± 0.031 |
+| 50 | 0.845 ± 0.034 | 0.640 ± 0.146 | 0.830 (1 run) | - |
+| all (288-320) | 0.960 ± 0.013 | 0.793 ± 0.087 | 0.965 (1 run) | - |
+
+Image AUROC. WinCLIP pixel metrics (mean over the 3 draws): pixel AUROC 0.958 / 0.968 / 0.971 and pixel AUPRO 0.839 / 0.867 / 0.877 for N = 1 / 5 / 10 (zero-shot: 0.909 and 0.699). The WinCLIP anomaly maps have low resolution (a 15 x 15 window grid), so the pixel metrics should not be over-interpreted.
 
 ### Smaller ablations (`screw`, 3 seeds)
 
@@ -120,11 +165,41 @@ Reading the table:
 - **What the most-missed images look like** (the two lowest-scoring images of each method, checked by eye): small defects on the flank of the thread (for example three tiny spots in `thread_side/000`, the most missed image of both PatchCore and YOLO), a small defect at the very tip of the screw (`manipulated_front/022`, YOLO), and a deformed piece of thread with low contrast to the surrounding thread (`thread_top/003`, PatchCore; `thread_side/016` and `021`, PaDiM). These are observations from 2 images per method, not a tested explanation.
 - **Caveats.** Each type has 23-25 images, so differences of about 0.03 AUROC between types or methods are not reliable. YOLO has no seed standard deviation (one training per fold), and its scores come from 4 different models. The pooled YOLO AUROC (0.909) is close to, but not the same as, the mean over folds (0.908). The threshold (95% of good images) is arbitrary; other values would change the recall numbers, not the AUROC.
 
+### WinCLIP by defect type (`screw`)
+
+AUROC of "all 41 good test images vs the defective images of one type" (mean over the 3 draws for N > 0). Recall: share of defective images found when the threshold keeps 95% of the good images below it.
+
+| defect type | n | zero-shot | N = 1 | N = 5 | N = 10 |
+|---|---|---|---|---|---|
+| manipulated_front | 24 | 0.497 | 0.527 | 0.673 | 0.732 |
+| scratch_head | 24 | 0.767 | 0.753 | 0.825 | 0.846 |
+| scratch_neck | 25 | 0.756 | 0.856 | 0.928 | 0.939 |
+| thread_side | 23 | 0.736 | 0.734 | 0.759 | 0.787 |
+| thread_top | 23 | 0.847 | 0.846 | 0.906 | 0.923 |
+| all defects | 119 | 0.720 | 0.744 | 0.819 | 0.846 |
+| recall at the 95% threshold (all defects) | 119 | 0.28 | 0.30 | 0.39 | 0.50 |
+
+Scores of 1.0 are common for WinCLIP (15 images in the zero-shot run, 44 at N = 1 for seed 42): the score is clipped after normalisation, which creates ties (images with exactly equal scores; AUROC counts a tie between a good and a defective image as half correct).
+
+### Speed
+
+Forward pass per image (model only, no file reading), RTX 4060 Laptop GPU, fp32, 256 x 256 input, median of 100 runs after 20 warm-up runs (`analysis/time_inference.py`). Trained weights were used for PatchCore and PaDiM; STFPM and EfficientAD were timed with untrained weights (speed does not depend on the weights). WinCLIP and YOLO were not timed.
+
+| method | batch 1 [ms/image] | batch 16 [ms/image] | training time on `screw` [s] |
+|---|---|---|---|
+| PaDiM | 4.7 | 1.0 | 21-49 (mean 38) |
+| STFPM | 10.1 | 1.2 | 1240-1246 |
+| EfficientAD (S) | 12.4 | 8.8 | 7598 |
+| PatchCore | 12.6 | 5.2 | 37-38 |
+
 ## Method in short
 
 - **PatchCore** stores features of all patches of the good training images (a *memory bank*) and shrinks it with greedy *coreset* subsampling. A test patch is scored by its distance to the nearest stored patch. The image score is the largest patch score.
 - **PaDiM** models the features at each image position as a Gaussian (mean and covariance over the training images) and scores a test patch by its Mahalanobis distance to that Gaussian.
-- Both use an ImageNet-pretrained CNN as a frozen feature extractor. **No defect image is ever used for training.**
+- **STFPM** trains a student network to reproduce the features of a frozen pretrained teacher on good images. On a defect the student and the teacher disagree, and the disagreement is the anomaly score.
+- **EfficientAD** also uses a teacher-student pair, but with a very small and fast feature extractor, plus an autoencoder that catches logical errors. Its maps are normalised with statistics from validation images.
+- **WinCLIP** is a vision-language model: CLIP compares windows of the image with text descriptions such as "damaged screw" (zero-shot) and, if reference images are given, also with the stored features of these images (few-shot). It is not trained on the target images at all.
+- PatchCore, PaDiM, STFPM and EfficientAD use only good images for training. WinCLIP uses none (zero-shot) or a few good ones as references. **No defect image is ever used for training these methods.**
 - **YOLOv8s** is a supervised object detector. It is trained on images with defect bounding boxes and used here as an anomaly detector: the image score is the highest box confidence (`conf = 0.001`), and the anomaly map is built from the predicted boxes.
 
 ## Metrics
@@ -150,7 +225,12 @@ python -m pip install torch torchvision --index-url https://download.pytorch.org
 
 # 2) the rest
 python -m pip install -r requirements.txt
+
+# 3) only for WinCLIP: this exact version (other versions fail inside anomalib)
+python -m pip install open-clip-torch==2.24.0
 ```
+
+**EfficientAD** additionally needs the [ImageNette](https://github.com/fastai/imagenette) dataset (about 1.5 GB, used by the method for its penalty term); put it in `datasets/imagenette` (or pass `--imagenet-dir`). **WinCLIP** downloads the CLIP weights on first use.
 
 Download the [MVTec AD dataset](https://www.mvtec.com/company/research/datasets/mvtec-ad) (not included in this repository) and extract it, e.g. to `data/mvtec/`. Each category folder must contain `train/good`, `test/<defect types>` and `ground_truth/<defect types>`.
 
@@ -165,25 +245,33 @@ Every run appends one row per seed to the CSV file (the header is checked first,
 
 | option | description |
 |---|---|
-| `--model` | `patchcore` (default) or `padim` |
-| `--backbone` | `wide_resnet50_2` (PatchCore default), `resnet18` (PaDiM default), any timm backbone |
+| `--model` | `patchcore` (default), `padim`, `stfpm`, `efficientad` or `winclip` |
+| `--backbone` | `wide_resnet50_2` (PatchCore default), `resnet18` (PaDiM and STFPM default), any timm backbone |
 | `--coreset-ratio`, `--num-neighbors` | PatchCore memory-bank fraction and neighbours for the image score |
 | `--n-features` | PaDiM number of random channels (the paper uses 550 for WRN50, which needs more than 8 GB of GPU memory; I used 200) |
-| `--image-size` | input resolution (default 256) |
+| `--epochs`, `--iterations` | STFPM (100 epochs by default) and EfficientAD (70,000 steps by default); `--iterations` fixes the number of steps instead of epochs |
+| `--efficientad-modelsize`, `--imagenet-dir` | EfficientAD model size (`s` or `m`) and the ImageNette folder |
+| `--val-split` | where the validation images come from (`auto`: the test split, except for EfficientAD, which takes 10% of the good training images) |
+| `--k-shot` | WinCLIP: number of reference images (0 = zero-shot) |
+| `--image-size` | input resolution (default 256; WinCLIP always uses 240) |
 | `--n-train` | few-shot: draw N random training images for each seed |
 | `--seeds` | one run per seed |
+| `--save-scores` | save the score of every test image to `scores/` (needed for the per-defect analysis) |
 | `--save-errors` | save a figure with the worst false positive and false negative |
 
 ### Reproducing the experiments
 
 ```bash
-# 4 categories x 2 methods x 3 seeds   (PowerShell: replace the loop syntax accordingly)
+# 15 categories x 2 methods x 3 seeds (PowerShell script, resumable, about 1.5 h on an RTX 4060 Laptop)
+powershell -ExecutionPolicy Bypass -File scripts/run_15_categories.ps1
+
+# or for one category in bash:
 for c in screw bottle transistor carpet; do
   python run_experiment.py --root data/mvtec/$c --category $c --model patchcore --backbone wide_resnet50_2 --coreset-ratio 0.01 --seeds 42 1 2 --out results.csv
   python run_experiment.py --root data/mvtec/$c --category $c --model padim --backbone wide_resnet50_2 --n-features 200 --seeds 42 1 2 --out results.csv
 done
 
-# few-shot (full memory bank)
+# few-shot PatchCore (full memory bank)
 for n in 1 5 10 50; do
   python run_experiment.py --root data/mvtec/screw --category screw --backbone wide_resnet50_2 --coreset-ratio 1.0 --n-train $n --seeds 42 1 2 --out results.csv
 done
@@ -193,9 +281,30 @@ for r in 0.1 0.01; do
   python run_experiment.py --root data/mvtec/screw --category screw --backbone wide_resnet50_2 --coreset-ratio $r --n-train 50 --seeds 42 1 2 --out results.csv
 done
 
-# tables and figures from the CSV files in results/
+# STFPM: full data, then few-shot (2,000 steps for every N)
+python run_experiment.py --root data/mvtec/screw --category screw --model stfpm --seeds 42 1 2 --save-scores --out results.csv
+for n in 1 5 10 50; do
+  python run_experiment.py --root data/mvtec/screw --category screw --model stfpm --n-train $n --iterations 2000 --seeds 42 1 2 --out results.csv
+done
+
+# EfficientAD (about 2 hours per run): full data, and N = 50
+python run_experiment.py --root data/mvtec/screw --category screw --model efficientad --imagenet-dir datasets/imagenette --seeds 42 --save-scores --out results.csv
+python run_experiment.py --root data/mvtec/screw --category screw --model efficientad --imagenet-dir datasets/imagenette --n-train 50 --val-split same_as_test --seeds 42 --out results.csv
+
+# WinCLIP: zero-shot (one run) and few-shot (3 draws)
+python run_experiment.py --root data/mvtec/screw --category screw --model winclip --k-shot 0 --seeds 42 --save-scores --out results.csv
+for k in 1 5 10; do
+  python run_experiment.py --root data/mvtec/screw --category screw --model winclip --k-shot $k --seeds 1 2 42 --save-scores --out results.csv
+done
+
+# speed, summary table, tables and figures from the CSV files in results/
+python analysis/time_inference.py
+python analysis/make_summary_table.py
 python analysis/make_report.py
+python analysis/anomaly_vs_supervised.py
 ```
+
+`make_report.py` reads `results_15.csv` (repository root or `results/`) to build the 15-category table and figure. The WinCLIP rows used by the plots are stored in `results/winclip_fewshot.csv`.
 
 ### Reproducing the supervised comparison (`screw`)
 
@@ -232,41 +341,57 @@ The fixed training settings (`val=False`, last weights, no selection on the test
 ## Repository structure
 
 ```
-run_experiment.py        # experiment runner (PatchCore / PaDiM, few-shot, CSV logging, per-image scores)
+run_experiment.py        # experiment runner (PatchCore / PaDiM / STFPM / EfficientAD / WinCLIP, few-shot, CSV logging, per-image scores)
 make_splits.py           # 4 stratified folds of the screw test images -> splits/screw_folds.csv
 make_yolo_data.py        # YOLO dataset for one fold (boxes from masks), optional N defective images
 yolo_scores.py           # per-image YOLO scores and image / pixel AUROC for one held-out fold
 merge_yolo_scores.py     # glues the 4 fold score files of YOLO into one 160-row file
 eval_folds.py            # AUROC per fold, mean and std across folds for all methods
+scripts/
+  run_15_categories.ps1  # PatchCore and PaDiM on all 15 categories (resumable)
 analysis/
-  make_report.py         # tables (results/summary.md) and figures of the PatchCore / PaDiM study
+  make_report.py         # tables (results/summary.md) and figures: four and fifteen categories, few-shot, ablation
+  make_summary_table.py  # one table for all methods on screw
+  time_inference.py      # forward-pass latency per image (batch 1 and 16)
   yolo_fewshot.py        # table and learning curve of the few-shot YOLO experiment
-  anomaly_vs_supervised.py  # both few-shot curves + PaDiM line in one figure
+  anomaly_vs_supervised.py  # all few-shot curves + PaDiM line in one figure
   per_defect_type.py     # AUROC and missed images per defect type
 splits/screw_folds.csv   # fold of every test image (path, defect_type, label, fold)
 scores/                  # per-image scores of every run (path, label, score)
+results_15.csv           # 90 runs: 15 categories x 2 methods x 3 seeds
 results/
   four_categories.csv    # 24 runs: 4 categories x 2 methods x 3 seeds
-  few_shot.csv           # 21 runs: N = 1, 5, 10, 50 (+ coreset control) and N = 320
+  fifteen_categories_table.csv   # mean and std per category and method (from results_15.csv)
+  few_shot.csv           # 21 runs: PatchCore N = 1, 5, 10, 50 (+ coreset control) and N = 320
+  stfpm_screw.csv, stfpm_fewshot.csv   # STFPM full-data runs and few-shot runs
+  efficientad_screw.csv, efficientad_fewshot.csv   # EfficientAD: full data and N = 50 (one run each)
+  winclip_fewshot.csv    # WinCLIP: zero-shot and N = 1, 5, 10 (10 runs)
   ablation_screw.csv     # 30 runs: neighbours, backbone, resolution, PaDiM backbones
+  inference_time.csv     # latency measurements
+  summary_all_methods.csv/.md   # table of all methods on screw
   folds_summary.csv, fold_auroc_per_run.csv   # AUROC per fold for all methods
   yolo_folds.csv         # YOLO trained on all defective images of the other folds
   yolo_fewshot.csv, yolo_fewshot_summary.csv  # 48 few-shot YOLO runs and their summary
+  auroc_by_defect_type.csv, recall_by_defect_type.csv   # per-defect-type analysis
   anomaly_vs_supervised.csv   # data of the combined figure
   summary.md             # tables of the PatchCore / PaDiM study
 figures/                 # PNG figures
 ```
 
-CSV columns: `data, category, model, backbone, layers, image_size, coreset_ratio, num_neighbors, seed, n_train, n_test_images, image_AUROC, image_F1Score, pixel_AUROC, pixel_AUPRO, pixel_F1Score, fit_s, test_s`. Empty cells mean "not applicable" (e.g. `coreset_ratio` for PaDiM).
+CSV columns: `data, category, model, backbone, layers, image_size, coreset_ratio, num_neighbors, epochs, steps, seed, val_split, n_train, n_test_images, image_AUROC, image_F1Score, pixel_AUROC, pixel_AUPRO, pixel_F1Score, fit_s, test_s`. Empty cells mean "not applicable" (e.g. `coreset_ratio` for PaDiM). For WinCLIP, `n_train` is the number of reference images (0 = zero-shot) and `fit_s` is 0 because nothing is trained.
 
 ## Limitations
 
 - **Only 3 seeds per setting.** Standard deviations are rough estimates. Differences smaller than about 0.03 AUROC should not be read as real (for instance N = 1 vs 5 vs 10, or 100% vs 10% coreset).
 - **The F1 threshold is chosen on the test set** (the validation split equals the test split, `ValSplitMode.SAME_AS_TEST`), so image F1 and pixel F1 are optimistic. AUROC and AUPRO do not depend on a threshold.
-- **The few-shot and supervised studies cover a single category** (`screw`). Results for other categories can differ.
+- **PatchCore and PaDiM cover 15 categories, everything else covers a single one.** STFPM, EfficientAD, WinCLIP, YOLO and all few-shot studies use `screw` only. Results for other categories can differ.
 - **The supervised comparison has only 4 folds** of 40 images (one image pair is worth about 0.003 AUROC), one YOLO training per fold for the all-data point and 3 draws per N in the few-shot study. Differences below about 0.03 AUROC are noise.
 - **YOLO and the anomaly detectors see different training data.** Both are scored on the same 160 test images, but the anomaly detectors train on the 320 good images of `train/good`, while YOLO trains on test images of the other folds (defective images and some good ones). N therefore counts good images for PatchCore and defective images for YOLO, and PatchCore is scored in one pass while YOLO is scored fold by fold with 4 different models (AUROC averaged).
 - YOLO image scores are the highest box confidence, so images without any box get 0 and tie. YOLO pixel AUROC (about 0.98) is computed from rectangles and is not comparable with the anomaly maps of PatchCore / PaDiM.
+- **EfficientAD: one run per setting, no error bars.** A run takes about 2 hours. The full-data run holds out 10% of the training images for map normalisation; the N = 50 run uses the test set for the normalisation statistics (`--val-split same_as_test`), so the two EfficientAD points are not computed the same way.
+- **STFPM** was trained with the paper's 100 epochs on the full data and with a fixed 2,000 steps in the few-shot runs, with ResNet-18 and no tuning. Its variance across seeds is large, so its numbers are rough.
+- **WinCLIP uses a different protocol:** 240 px input and CLIP normalisation instead of 256 px, a text prompt built from the category name (`screw`) with no tuning, and a single deterministic zero-shot run. Its anomaly maps are low-resolution, and its scores are clipped at 1.0, which creates ties. I did not test how sensitive the result is to the class name.
+- **Two bugs of `anomalib 2.7.0` are worked around in `run_experiment.py`** for WinCLIP few-shot: the model reads `pre_processor.test_transform`, which does not exist, and the reference-image loader has no collate function. The workaround applies the same resize and normalisation as for the test images; a different `anomalib` version may not need it.
 - The training settings of YOLO (YOLOv8s, 100 epochs for the all-data runs, about 1,500 iterations in the few-shot runs) were fixed in advance and not tuned.
 - PaDiM uses 200 channels instead of the 550 recommended for WideResNet-50 (GPU memory), so it may be slightly handicapped.
 - The explanation for why `screw` needs many images (screws appear in many orientations, and defects are tiny) is a hypothesis that I did not test.
@@ -276,6 +401,10 @@ CSV columns: `data, category, model, backbone, layers, image_size, coreset_ratio
 
 - K. Roth et al., *Towards Total Recall in Industrial Anomaly Detection* (PatchCore), CVPR 2022. [arXiv:2106.08265](https://arxiv.org/abs/2106.08265)
 - T. Defard et al., *PaDiM: a Patch Distribution Modeling Framework for Anomaly Detection and Localization*, 2020. [arXiv:2011.08785](https://arxiv.org/abs/2011.08785)
+- G. Wang et al., *Student-Teacher Feature Pyramid Matching for Anomaly Detection* (STFPM), 2021. [arXiv:2103.04257](https://arxiv.org/abs/2103.04257)
+- K. Batzner et al., *EfficientAD: Accurate Visual Anomaly Detection at Millisecond-Level Latencies*, WACV 2024. [arXiv:2303.14535](https://arxiv.org/abs/2303.14535)
+- J. Jeong et al., *WinCLIP: Zero-/Few-Shot Anomaly Classification and Segmentation*, CVPR 2023. [arXiv:2303.14814](https://arxiv.org/abs/2303.14814)
+- A. Radford et al., *Learning Transferable Visual Models From Natural Language Supervision* (CLIP), 2021. [arXiv:2103.00020](https://arxiv.org/abs/2103.00020)
 - P. Bergmann et al., *MVTec AD: A Comprehensive Real-World Dataset for Unsupervised Anomaly Detection*, CVPR 2019.
 - G. Jocher et al., *Ultralytics YOLOv8*. [github.com/ultralytics/ultralytics](https://github.com/ultralytics/ultralytics)
 - S. Akcay et al., *Anomalib: A Deep Learning Library for Anomaly Detection*. [arXiv:2202.08341](https://arxiv.org/abs/2202.08341)
