@@ -184,11 +184,73 @@ def ablation():
     return md_table(["configuration (screw, 3 seeds)", "image AUROC", "pixel AUROC", "pixel F1", "fit time [s]"], rows)
 
 
+def fifteen_categories():
+    """All 15 MVTec AD categories: PatchCore vs PaDiM, 3 seeds. Needs results_15.csv (repo root or results/)."""
+    path = next((p for p in (RES / "results_15.csv", ROOT / "results_15.csv") if p.exists()), None)
+    if path is None:
+        return None
+    df = pd.read_csv(path)
+    names = {"patchcore": "PatchCore", "padim": "PaDiM"}
+    g = mean_std(df, ["category", "model"])
+    order = list(g.xs("patchcore", level="model")[("image_AUROC", "mean")].sort_values().index)
+
+    per_seed = df.groupby(["model", "seed"])[METRICS].mean()
+    def avg(model, m):
+        v = per_seed.loc[model, m]
+        return f"{v.mean():.3f} ± {v.std():.3f}"
+
+    rows = []
+    for cat in order:
+        for model in ("patchcore", "padim"):
+            rows.append([cat, names[model]] + [fmt(g, m, (cat, model)) for m in METRICS])
+    for model in ("patchcore", "padim"):
+        rows.append(["**mean of 15**", names[model]] + [avg(model, m) for m in METRICS])
+    table = md_table(["category", "method", "image AUROC", "image F1", "pixel AUROC", "pixel AUPRO", "pixel F1"], rows)
+
+    flat = g.copy()
+    flat.columns = [f"{a}_{b}" for a, b in flat.columns]
+    flat.reset_index().to_csv(RES / "fifteen_categories_table.csv", index=False)
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 6.4), facecolor=SURFACE, sharey=True)
+    y = np.arange(len(order) + 1)
+    labels = order + ["mean of 15"]
+    for ax, m, title, lo in zip(axes, ["image_AUROC", "pixel_AUPRO"], ["Image AUROC", "Pixel AUPRO"], (0.78, 0.78)):
+        style(ax)
+        ax.grid(axis="x", color=GRID, lw=0.8)
+        ax.grid(axis="y", visible=False)
+        for k, (model, color) in enumerate([("patchcore", BLUE), ("padim", ORANGE)]):
+            mu = [g.loc[(c, model), (m, "mean")] for c in order] + [per_seed.loc[model, m].mean()]
+            sd = [g.loc[(c, model), (m, "std")] for c in order] + [per_seed.loc[model, m].std()]
+            ax.barh(y + (k - 0.5) * 0.38, mu, 0.34, xerr=sd, color=color, capsize=2,
+                    label=names[model], error_kw={"lw": 1.0, "ecolor": INK2})
+            for yi, v, e in zip(y + (k - 0.5) * 0.38, mu, sd):
+                inside = v > 0.995
+                ax.text(v - 0.004 if inside else v + e + 0.004, yi, f"{v:.2f}", va="center",
+                        ha="right" if inside else "left", fontsize=7, color="white" if inside else INK)
+        ax.axhline(len(order) - 0.5, color=GRID, lw=1.2)
+        ax.set_xlim(lo, 1.03)
+        ax.set_title(title, loc="left", fontsize=10.5, color=INK)
+    axes[0].set_yticks(y)
+    axes[0].set_yticklabels(labels)
+    axes[0].invert_yaxis()
+    h, l = axes[0].get_legend_handles_labels()
+    fig.legend(h, l, frameon=False, loc="upper right", ncol=2, fontsize=9, bbox_to_anchor=(0.98, 0.93))
+    fig.suptitle("PatchCore vs PaDiM on all 15 MVTec AD categories\n(mean ± std over 3 seeds; hardest for PatchCore at the top)",
+                 x=0.03, ha="left", fontsize=11.5, color=INK)
+    fig.tight_layout(rect=[0, 0, 1, 0.91])
+    fig.savefig(FIG / "fifteen_categories.png", dpi=150, facecolor=SURFACE)
+    plt.close(fig)
+    return table
+
+
 if __name__ == "__main__":
     t_four = four_categories()
     t_few, t_ctrl = few_shot()
     t_abl = ablation()
+    t_15 = fifteen_categories()
     out = ("## Four categories\n\n" + t_four + "\n\n## Few-shot (screw)\n\n" + t_few +
            "\n\n## Coreset control (N = 50)\n\n" + t_ctrl + "\n\n## Ablation (screw)\n\n" + t_abl + "\n")
+    if t_15:
+        out += "\n## All 15 categories\n\n" + t_15 + "\n"
     (RES / "summary.md").write_text(out, encoding="utf-8")
     print(out)
