@@ -1,4 +1,4 @@
-"""Build summary tables (Markdown) and figures from the CSV files in results/."""
+"""Build summary tables and figures from the CSV files in results/."""
 
 from pathlib import Path
 
@@ -192,8 +192,9 @@ def fifteen_categories():
     df = pd.read_csv(path)
     names = {"patchcore": "PatchCore", "padim": "PaDiM"}
     g = mean_std(df, ["category", "model"])
-    order = list(g.xs("patchcore", level="model")[("image_AUROC", "mean")].sort_values().index)
+    order = list(g.xs("patchcore", level="model")[("image_AUROC", "mean")].sort_values().index)  # hardest first
 
+    # mean over the 15 categories, one value per seed; std = spread of that mean across the 3 seeds
     per_seed = df.groupby(["model", "seed"])[METRICS].mean()
     def avg(model, m):
         v = per_seed.loc[model, m]
@@ -212,7 +213,7 @@ def fifteen_categories():
     flat.reset_index().to_csv(RES / "fifteen_categories_table.csv", index=False)
 
     fig, axes = plt.subplots(1, 2, figsize=(11, 6.4), facecolor=SURFACE, sharey=True)
-    y = np.arange(len(order) + 1)
+    y = np.arange(len(order) + 1)                       # last row = mean of 15
     labels = order + ["mean of 15"]
     for ax, m, title, lo in zip(axes, ["image_AUROC", "pixel_AUPRO"], ["Image AUROC", "Pixel AUPRO"], (0.78, 0.78)):
         style(ax)
@@ -243,6 +244,70 @@ def fifteen_categories():
     return table
 
 
+def winclip_15():
+    """All 15 categories: PatchCore / PaDiM (full train set, 3 seeds) vs WinCLIP (0 and 10 reference images).
+    Needs results_winclip_15.csv and results_15.csv (repo root or results/)."""
+    p_w = next((p for p in (RES / "results_winclip_15.csv", ROOT / "results_winclip_15.csv") if p.exists()), None)
+    p_b = next((p for p in (RES / "results_15.csv", ROOT / "results_15.csv") if p.exists()), None)
+    if p_w is None or p_b is None:
+        return None
+    w, b = pd.read_csv(p_w), pd.read_csv(p_b)
+    series = {  # label -> (frame, color)
+        "PatchCore (all train images)": b[b.model == "patchcore"],
+        "PaDiM (all train images)": b[b.model == "padim"],
+        "WinCLIP, 0 images": w[w.n_train == 0],
+        "WinCLIP, 10 images": w[w.n_train == 10],
+    }
+    cols = [BLUE, ORANGE, "#8e8e93", "#7a4fd1"]
+    stats = {k: v.groupby("category")[METRICS].agg(["mean", "std"]) for k, v in series.items()}
+    order = list(stats["PatchCore (all train images)"][("image_AUROC", "mean")].sort_values().index)
+
+    def cell(k, m, c):
+        mu, sd = stats[k].loc[c, (m, "mean")], stats[k].loc[c, (m, "std")]
+        return f"{mu:.3f}" + (f" ± {sd:.3f}" if pd.notna(sd) and sd > 0 else "")
+
+    def mean15(k, m):
+        v = series[k].groupby(["seed", "category"])[m].mean().groupby("seed").mean() if k != "WinCLIP, 0 images" \
+            else series[k].groupby("category")[m].mean().mean()
+        return f"{v.mean():.3f}" if hasattr(v, "mean") else f"{v:.3f}"
+
+    rows = [[c] + [cell(k, "image_AUROC", c) for k in series] for c in order]
+    rows.append(["**mean of 15**"] + [mean15(k, "image_AUROC") for k in series])
+    t_img = md_table(["category"] + list(series), rows)
+    rows = [[c] + [cell(k, "pixel_AUPRO", c) for k in series] for c in order]
+    rows.append(["**mean of 15**"] + [mean15(k, "pixel_AUPRO") for k in series])
+    t_pro = md_table(["category"] + list(series), rows)
+    flat = pd.concat({k: v for k, v in stats.items()}, axis=1)
+    flat.columns = [f"{a} | {b_}_{c}" for a, b_, c in flat.columns]
+    flat.reset_index().to_csv(RES / "winclip_15_table.csv", index=False)
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 7.2), facecolor=SURFACE, sharey=True)
+    y = np.arange(len(order) + 1)
+    for ax, m, title, lo in zip(axes, ["image_AUROC", "pixel_AUPRO"], ["Image AUROC", "Pixel AUPRO"], (0.45, 0.3)):
+        style(ax)
+        ax.grid(axis="x", color=GRID, lw=0.8)
+        ax.grid(axis="y", visible=False)
+        for k, (name, color) in enumerate(zip(series, cols)):
+            mu = [stats[name].loc[c, (m, "mean")] for c in order]
+            mu.append(float(np.mean(mu)))
+            ax.barh(y + (k - 1.5) * 0.2, mu, 0.18, color=color, label=name)
+        ax.axhline(len(order) - 0.5, color=GRID, lw=1.2)
+        ax.set_xlim(lo, 1.02)
+        ax.set_title(title, loc="left", fontsize=10.5, color=INK)
+    axes[0].set_yticks(y)
+    axes[0].set_yticklabels(order + ["mean of 15"])
+    axes[0].invert_yaxis()
+    h, l = axes[0].get_legend_handles_labels()
+    fig.legend(h, l, frameon=False, loc="upper right", ncol=2, fontsize=8.5, bbox_to_anchor=(0.99, 0.95))
+    fig.suptitle("WinCLIP (0 and 10 images) vs PatchCore / PaDiM (full train set) on all 15 categories\n"
+                 "(PatchCore, PaDiM, WinCLIP 10: mean over 3 seeds / draws; hardest for PatchCore at the top)",
+                 x=0.03, ha="left", fontsize=11, color=INK)
+    fig.tight_layout(rect=[0, 0, 1, 0.9])
+    fig.savefig(FIG / "winclip_15.png", dpi=150, facecolor=SURFACE)
+    plt.close(fig)
+    return "### Image AUROC\n\n" + t_img + "\n\n### Pixel AUPRO\n\n" + t_pro
+
+
 if __name__ == "__main__":
     t_four = four_categories()
     t_few, t_ctrl = few_shot()
@@ -252,5 +317,8 @@ if __name__ == "__main__":
            "\n\n## Coreset control (N = 50)\n\n" + t_ctrl + "\n\n## Ablation (screw)\n\n" + t_abl + "\n")
     if t_15:
         out += "\n## All 15 categories\n\n" + t_15 + "\n"
+    t_wc = winclip_15()
+    if t_wc:
+        out += "\n## WinCLIP on all 15 categories\n\n" + t_wc + "\n"
     (RES / "summary.md").write_text(out, encoding="utf-8")
     print(out)

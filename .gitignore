@@ -14,3 +14,5 @@ results_backup_*.csv
 yolo_data/
 scores_yolo/
 *.ptdatasets/
+
+run_*_log.txt

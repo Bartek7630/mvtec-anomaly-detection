@@ -51,6 +51,9 @@ def parse_args():
     p.add_argument("--model", choices=["patchcore", "padim", "stfpm", "efficientad", "winclip"], default="patchcore")
     p.add_argument("--efficientad-modelsize", default="s", choices=["s", "m"], help="EfficientAD: size of teacher and student")
     p.add_argument("--k-shot", type=int, default=0, help="WinClip: number of shots to use for training (0 means no shots)")
+    p.add_argument("--class-name", default=None,
+                   help="WinClip: object name used in the text prompts. Default: the category name with underscores replaced by spaces "
+                   "(metal_nut -> 'metal nut', screw -> 'screw')")
     p.add_argument("--imagenet-dir", default="datasets/imagenette",
                    help="EfficientAD: folder with ImageNette")
     p.add_argument("--val-split", choices=["auto", "same_as_test", "from_train"], default="auto",
@@ -294,7 +297,7 @@ def _run(args, seed, normal_dir):
     elif args.model == "winclip":
         ref_source = str(Path(normal_dir) if Path(normal_dir).is_absolute() else root / normal_dir) if args.k_shot > 0 else None
         model = WinClip(
-            class_name=args.category,
+            class_name=args.class_name or args.category.replace("_", " "),
             k_shot=args.k_shot,
             few_shot_source=ref_source,
             pre_processor=pre_processor,
