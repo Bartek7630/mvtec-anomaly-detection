@@ -1,0 +1,46 @@
+category,method_a,method_b,diff,ci_low,ci_high,significant
+bottle,PatchCore,PaDiM,0.0,0.0,0.0,False
+bottle,PatchCore,WinCLIP 10,0.0019,0.0,0.0071,False
+bottle,WinCLIP 10,WinCLIP 0,0.0116,-0.0009,0.0343,False
+cable,PatchCore,PaDiM,0.1142,0.0716,0.1627,True
+cable,PatchCore,WinCLIP 10,0.0625,0.0249,0.107,True
+cable,WinCLIP 10,WinCLIP 0,0.074,0.0424,0.1081,True
+capsule,PatchCore,PaDiM,0.0913,0.028,0.1716,True
+capsule,PatchCore,WinCLIP 10,0.1288,0.0653,0.2009,True
+capsule,WinCLIP 10,WinCLIP 0,0.1986,0.1027,0.3,True
+carpet,PatchCore,PaDiM,-0.0036,-0.0135,0.0028,False
+carpet,PatchCore,WinCLIP 10,-0.012,-0.0319,-0.0003,True
+carpet,WinCLIP 10,WinCLIP 0,0.0048,0.0,0.0128,False
+grid,PatchCore,PaDiM,0.0125,-0.0068,0.0356,False
+grid,PatchCore,WinCLIP 10,-0.0097,-0.0257,0.0,False
+grid,WinCLIP 10,WinCLIP 0,0.0033,-0.0006,0.0125,False
+hazelnut,PatchCore,PaDiM,0.1799,0.1124,0.2578,True
+hazelnut,PatchCore,WinCLIP 10,0.0287,0.0066,0.0577,True
+hazelnut,WinCLIP 10,WinCLIP 0,0.046,0.0114,0.0842,True
+leather,PatchCore,PaDiM,0.0,0.0,0.0,False
+leather,PatchCore,WinCLIP 10,0.0,0.0,0.0,False
+leather,WinCLIP 10,WinCLIP 0,0.0,0.0,0.0,False
+metal_nut,PatchCore,PaDiM,0.0476,0.0091,0.0997,True
+metal_nut,PatchCore,WinCLIP 10,0.0024,-0.0022,0.011,False
+metal_nut,WinCLIP 10,WinCLIP 0,0.0422,0.0143,0.0831,True
+pill,PatchCore,PaDiM,0.0508,0.015,0.0917,True
+pill,PatchCore,WinCLIP 10,0.0206,-0.0156,0.063,False
+pill,WinCLIP 10,WinCLIP 0,0.4274,0.363,0.4839,True
+screw,PatchCore,PaDiM,0.1306,0.0707,0.1976,True
+screw,PatchCore,WinCLIP 10,0.114,0.0455,0.1854,True
+screw,WinCLIP 10,WinCLIP 0,0.126,0.0705,0.1802,True
+tile,PatchCore,PaDiM,0.0076,0.0013,0.0179,True
+tile,PatchCore,WinCLIP 10,0.0005,0.0,0.0023,False
+tile,WinCLIP 10,WinCLIP 0,0.0002,0.0,0.0012,False
+toothbrush,PatchCore,PaDiM,0.0407,0.0,0.1017,False
+toothbrush,PatchCore,WinCLIP 10,-0.0583,-0.1504,0.011,False
+toothbrush,WinCLIP 10,WinCLIP 0,0.1222,0.028,0.2408,True
+transistor,PatchCore,PaDiM,0.0447,0.018,0.0788,True
+transistor,PatchCore,WinCLIP 10,0.0794,0.0359,0.1322,True
+transistor,WinCLIP 10,WinCLIP 0,0.0256,-0.0088,0.0628,False
+wood,PatchCore,PaDiM,-0.0035,-0.0152,0.0043,False
+wood,PatchCore,WinCLIP 10,-0.0082,-0.0249,0.0029,False
+wood,WinCLIP 10,WinCLIP 0,0.0181,0.0024,0.0455,True
+zipper,PatchCore,PaDiM,0.0782,0.0342,0.126,True
+zipper,PatchCore,WinCLIP 10,0.0144,-0.0067,0.0399,False
+zipper,WinCLIP 10,WinCLIP 0,0.0562,0.0234,0.0945,True
