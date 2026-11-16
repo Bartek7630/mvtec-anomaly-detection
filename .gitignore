@@ -16,3 +16,4 @@ scores_yolo/
 *.ptdatasets/
 
 run_*_log.txt
+.venv/
