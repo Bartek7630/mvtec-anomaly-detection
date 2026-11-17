@@ -22,6 +22,7 @@ It is the experimental part of my BSc thesis in Artificial Intelligence (Catholi
 12. **Image F1 can mislead.** 74% of the `screw` test images are defective, so predicting "defective" for everything already gives F1 = 0.853. Judge few-shot runs by AUROC.
 13. **Which differences are real (95% bootstrap intervals, all 15 categories).** PatchCore beats PaDiM significantly on 9 of 15 categories (always in favour of PatchCore): 8 of the 10 objects but only 1 of the 5 textures (`tile`, +0.008). WinCLIP with 10 reference images is significantly worse than PatchCore (trained on all good images) on 5 categories (`cable`, `capsule`, `hazelnut`, `screw`, `transistor`), significantly better on 1 (`carpet`, borderline) and shows no detectable difference on the other 9, including `toothbrush` where the intervals are very wide (42 test images). Ten reference images improve on zero-shot significantly on 9 of 15 categories, most of all on `pill` (0.509 to 0.936). "Not significant" means no evidence of a difference, not that the methods are equal.
 14. **With a fair threshold the methods differ much more than AUROC suggests (`screw`).** The threshold is the 95th percentile of the good images of the other 3 folds, so about 5% false alarms are accepted. Then EfficientAD finds 93% of the defects (single run), PatchCore 79 ± 10%, YOLOv8s 68-69%, WinCLIP with 10 images 50%, STFPM 48% and PaDiM 46%, although EfficientAD and PatchCore have almost the same AUROC (0.965 vs 0.960). The F1 with these thresholds is above the 0.853 of the trivial rule "everything is defective" only for EfficientAD (0.95) and PatchCore (0.87); for the others it is 0.63-0.80. With only about 2% defective parts in production, about 80% of the alarms of PatchCore and EfficientAD would be false alarms at this threshold.
+15. **The few-shot result from `screw` does not carry over to the other categories as it stands.** On `screw` PatchCore with 5-10 good images is close to chance (0.55-0.60). On `metal_nut` and `transistor` the same setting already gives 0.96-0.98 (N = 5 and 10), and on `carpet` even one image is enough (0.985, flat up to N = 50). WinCLIP is clearly better than PatchCore with 1-10 images on `metal_nut` (0.97-1.00 vs 0.82-0.98), slightly better on `carpet`, but worse on `transistor` from N = 5 on (0.91 vs 0.97). In pixel AUPRO PatchCore is ahead of WinCLIP on `metal_nut` and `transistor` at every N. So "PatchCore needs about 50 images" is a property of `screw`, not of PatchCore; a likely reason is that screws appear in many orientations and have tiny defects, which I did not test.
 
 ## Results
 
@@ -131,6 +132,27 @@ N good images are drawn at random with the same 3 draws as for PatchCore (seeds 
 | all (288-320) | 0.960 ± 0.013 | 0.793 ± 0.087 | 0.965 (1 run) | - |
 
 Image AUROC. WinCLIP pixel metrics (mean over the 3 draws): pixel AUROC 0.958 / 0.968 / 0.971 and pixel AUPRO 0.839 / 0.867 / 0.877 for N = 1 / 5 / 10 (zero-shot: 0.909 and 0.699). The WinCLIP anomaly maps have low resolution (a 15 x 15 window grid), so the pixel metrics should not be over-interpreted.
+
+### Few-shot on `metal_nut`, `transistor` and `carpet`
+
+![Few-shot on three more categories](figures/fewshot_3cat.png)
+
+The same protocol as for `screw`: N good images (N = 1, 5, 10, 50) drawn at random for PatchCore (coreset 1.0, 3 seeds), and k = 1, 5, 10 reference images for WinCLIP (the same 3 draws) plus a single zero-shot run. Dashed line: PatchCore with all training images. Table: `results/fewshot_3cat_table.md`, raw data: `results_fewshot_3cat.csv`, plot script: `analysis/fewshot_3cat.py`. Image AUROC, mean over 3 seeds (zero-shot: 1 run):
+
+| category | method | N = 0 | N = 1 | N = 5 | N = 10 | N = 50 | all images |
+|---|---|---|---|---|---|---|---|
+| `metal_nut` | PatchCore | | 0.817 ± 0.027 | 0.958 ± 0.012 | 0.977 ± 0.002 | 0.994 ± 0.003 | 0.999 |
+| `metal_nut` | WinCLIP | 0.955 | 0.973 ± 0.029 | 0.996 ± 0.001 | 0.997 ± 0.001 | | |
+| `transistor` | PatchCore | | 0.809 ± 0.150 | 0.967 ± 0.010 | 0.973 ± 0.012 | 0.988 ± 0.002 | 0.993 |
+| `transistor` | WinCLIP | 0.888 | 0.874 ± 0.003 | 0.909 ± 0.008 | 0.913 ± 0.013 | | |
+| `carpet` | PatchCore | | 0.985 ± 0.001 | 0.987 ± 0.002 | 0.984 ± 0.003 | 0.985 ± 0.001 | 0.986 |
+| `carpet` | WinCLIP | 0.993 | 0.995 ± 0.002 | 0.998 ± 0.000 | 0.998 ± 0.000 | | |
+
+What the three categories show:
+- **PatchCore needs far fewer images here than on `screw`.** With N = 5 it reaches 0.96 (`metal_nut`) and 0.97 (`transistor`), against 0.55 on `screw`. With a single image it is unreliable on the objects (`transistor`: 0.65, 0.82 and 0.95 for the three draws) and fine on the texture (`carpet`, which does not improve with more images).
+- **WinCLIP wins at the lowest N on `metal_nut`, not on `transistor`.** On `metal_nut`, one reference image (0.973) already beats PatchCore with 5 images (0.958), and PatchCore only catches up at N = 50. On `transistor` WinCLIP is ahead only at N = 1, where PatchCore is very unstable; from N = 5 on PatchCore is better by about 0.06.
+- **Localisation favours PatchCore on objects.** Pixel AUPRO at N = 5: 0.906 vs 0.786 on `metal_nut`, 0.895 vs 0.690 on `transistor`. On `carpet` the two are equal (about 0.95). Zero-shot WinCLIP localises poorly everywhere (AUPRO 0.37, 0.45, 0.67).
+- No confidence intervals were computed for these categories, and with 3 seeds only differences of several hundredths should be trusted (the large ones above).
 
 ### Smaller ablations (`screw`, 3 seeds)
 
@@ -435,7 +457,7 @@ CSV columns: `data, category, model, backbone, layers, image_size, coreset_ratio
 - **The bootstrap intervals describe the test set only.** They show how much a result would change with a different sample of test images, not with a different training run or random seed (seeds are averaged inside each resample and reported separately as standard deviations). Intervals were not corrected for the 45 comparisons.
 - **Only 3 seeds per setting.** Standard deviations are rough estimates. Differences smaller than about 0.03 AUROC should not be read as real (for instance N = 1 vs 5 vs 10, or 100% vs 10% coreset).
 - **The F1 threshold is chosen on the test set** (the validation split equals the test split, `ValSplitMode.SAME_AS_TEST`), so image F1 and pixel F1 are optimistic. AUROC and AUPRO do not depend on a threshold. The section "Honest decision threshold" repeats the evaluation for `screw` with a threshold taken from good images of other folds.
-- **PatchCore, PaDiM and WinCLIP (zero-shot and 10 images) cover 15 categories, everything else covers a single one.** STFPM, EfficientAD, YOLO and all few-shot studies use `screw` only. Results for other categories can differ.
+- **PatchCore, PaDiM and WinCLIP (zero-shot and 10 images) cover 15 categories; the few-shot study of PatchCore and WinCLIP covers `screw`, `metal_nut`, `transistor` and `carpet`; everything else covers a single one.** STFPM, EfficientAD, YOLO and the other few-shot studies use `screw` only. Results for other categories can differ.
 - **The supervised comparison has only 4 folds** of 40 images (one image pair is worth about 0.003 AUROC), one YOLO training per fold for the all-data point and 3 draws per N in the few-shot study. Differences below about 0.03 AUROC are noise.
 - **YOLO and the anomaly detectors see different training data.** Both are scored on the same 160 test images, but the anomaly detectors train on the 320 good images of `train/good`, while YOLO trains on test images of the other folds (defective images and some good ones). N therefore counts good images for PatchCore and defective images for YOLO, and PatchCore is scored in one pass while YOLO is scored fold by fold with 4 different models (AUROC averaged).
 - YOLO image scores are the highest box confidence, so images without any box get 0 and tie. YOLO pixel AUROC (about 0.98) is computed from rectangles and is not comparable with the anomaly maps of PatchCore / PaDiM.
