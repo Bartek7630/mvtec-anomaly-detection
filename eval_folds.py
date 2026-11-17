@@ -1,7 +1,8 @@
 """Compute image-level AUROC separately for every fold from the per-image score files.
 
 Input:  scores/*.csv (columns path, label, score; written by run_experiment.py --save-scores)
-        splits/screw_folds.csv (columns path, defect_type, label, fold; written by make_splits.py)
+        splits/<category>_folds.csv (columns path, defect_type, label, fold; written by make_splits.py)
+        Only the files whose name starts with "<category>_" are used (scores/ holds many categories).
 Output: a table with AUROC per method and fold, its mean and the standard deviation across folds.
 """
 
@@ -15,16 +16,17 @@ from sklearn.metrics import roc_auc_score
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--scores-dir", default="scores", help="folder with the per-image score files")
-    p.add_argument("--folds", default="splits/screw_folds.csv", help="CSV file with the fold of every test image")
+    p.add_argument("--category", default="screw", help="MVTec AD category (selects the score files and the folds file)")
+    p.add_argument("--folds", default=None, help="CSV file with the fold of every test image (default: splits/<category>_folds.csv)")
     p.add_argument("--out-dir", default="results", help="folder for the output tables")
     return p.parse_args()
 
 
-def load_scores(scores_dir: Path) -> pd.DataFrame:
+def load_scores(scores_dir: Path, category: str) -> pd.DataFrame:
     """Read all score files and stack them into one table with an extra 'run' column (the file name)."""
-    files = sorted(scores_dir.glob("*.csv"))
+    files = sorted(scores_dir.glob(f"{category}_*.csv"))
     if not files:
-        raise SystemExit(f"No score files found in {scores_dir}")
+        raise SystemExit(f"No score files {category}_*.csv found in {scores_dir}")
     tables = []
     for file in files:
         table = pd.read_csv(file)
@@ -55,8 +57,10 @@ def fold_auroc(group: pd.DataFrame) -> float:
 
 def main():
     args = parse_args()
-    folds = pd.read_csv(args.folds).rename(columns={"label": "label_folds"})
-    scores = load_scores(Path(args.scores_dir))
+    folds_file = args.folds or f"splits/{args.category}_folds.csv"
+    print(f"Category: {args.category}, folds: {folds_file}")
+    folds = pd.read_csv(folds_file).rename(columns={"label": "label_folds"})
+    scores = load_scores(Path(args.scores_dir), args.category)
 
     merged = scores.merge(folds[["path", "label_folds", "fold"]], on="path", how="left", validate="many_to_one")
     check_merge(merged, n_images=len(folds))
@@ -64,9 +68,10 @@ def main():
     per_run = (merged.groupby(["run", "fold"]).apply(fold_auroc, include_groups=False)
                .rename("auroc").reset_index())
     per_run["method"] = per_run["run"].str.rsplit("_seed", n=1).str[0]
-    per_run["seed"] = per_run["run"].str.rsplit("_seed", n=1).str[-1]
+    per_run["seed"] = per_run["run"].str.rsplit("_seed", n=1).str[-1].astype(int)
+    per_run["auroc"] = per_run["auroc"].round(4)
+    per_run = per_run[["method", "seed", "fold", "auroc", "run"]].sort_values(["method", "seed", "fold"])
 
-    # mean over seeds inside each fold, then mean and std across folds
     per_fold = per_run.groupby(["method", "fold"])["auroc"].mean().unstack("fold")
     per_fold.columns = [f"fold_{int(c)}" for c in per_fold.columns]
     summary = per_fold.copy()
@@ -75,13 +80,14 @@ def main():
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    per_run.to_csv(out_dir / "fold_auroc_per_run.csv", index=False)
-    summary.round(4).to_csv(out_dir / "folds_summary.csv")
+    suffix = "" if args.category == "screw" else f"_{args.category}"   # screw keeps its file names
+    per_run.to_csv(out_dir / f"fold_auroc_per_run{suffix}.csv", index=False)
+    summary.round(4).to_csv(out_dir / f"folds_summary{suffix}.csv")
 
     pd.set_option("display.width", 200)
     pd.set_option("display.max_colwidth", 70)
     print(summary.round(3).to_string())
-    print(f"\nSaved {out_dir / 'folds_summary.csv'} and {out_dir / 'fold_auroc_per_run.csv'}")
+    print(f"\nSaved {out_dir / f'folds_summary{suffix}.csv'} and {out_dir / f'fold_auroc_per_run{suffix}.csv'}")
 
 
 if __name__ == "__main__":

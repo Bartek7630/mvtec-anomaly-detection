@@ -23,7 +23,8 @@ def parse_args():
     p.add_argument("--weights", required=True, help="trained weights, e.g. runs/detect/fold0_all_640/weights/last.pt")
     p.add_argument("--data-dir", required=True, help="folder created by make_yolo_data.py, e.g. yolo_data/fold0")
     p.add_argument("--root", required=True, help="MVTec AD category folder (needed for the ground-truth masks)")
-    p.add_argument("--folds", default="splits/screw_folds.csv")
+    p.add_argument("--category", default=None, help="category name (default: the name of the --root folder)")
+    p.add_argument("--folds", default=None, help="default: splits/<category>_folds.csv")
     p.add_argument("--fold", type=int, required=True)
     p.add_argument("--imgsz", type=int, required=True, help="use the same size as in training")
     p.add_argument("--name", default=None, help="label of this run in the output files (default: weights folder name)")
@@ -69,10 +70,12 @@ def load_mask(root: Path, defect_type: str, stem: str, shape):
 def main():
     args = parse_args()
     root, data_dir = Path(args.root), Path(args.data_dir)
+    category = args.category or root.resolve().name
+    folds_file = args.folds or f"splits/{category}_folds.csv"
     rng = np.random.default_rng(args.seed)
     name = args.name or Path(args.weights).parent.parent.name
 
-    folds = pd.read_csv(args.folds)
+    folds = pd.read_csv(folds_file)
     test_rows = folds[folds["fold"] == args.fold]
     lookup = {f"{r.defect_type}_{Path(r.path).stem}": r for r in test_rows.itertuples()}
 
@@ -83,7 +86,7 @@ def main():
     for result in results:
         key = Path(result.path).stem
         if key not in lookup:
-            raise SystemExit(f"Image {key} is not in fold {args.fold} of {args.folds}")
+            raise SystemExit(f"Image {key} is not in fold {args.fold} of {folds_file}")
         row = lookup[key]
         score, amap = image_score_and_map(result)
         assert abs(float(amap.max()) - score) < 1e-6, f"map and score disagree for {key}"

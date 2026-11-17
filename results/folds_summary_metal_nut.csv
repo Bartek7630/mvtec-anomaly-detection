@@ -1,0 +1,12 @@
+method,fold_0,fold_1,fold_2,fold_3,mean,std_across_folds
+metal_nut_padim_wide_resnet50_2_s256_d200_nall,0.9833,0.9194,0.901,0.9924,0.949,0.0456
+metal_nut_patchcore_wide_resnet50_2_s256_cr0.01_nall,1.0,0.9972,1.0,1.0,0.9993,0.0014
+metal_nut_patchcore_wide_resnet50_2_s256_cr1.0_n1,0.8667,0.7139,0.8961,0.8106,0.8218,0.0802
+metal_nut_patchcore_wide_resnet50_2_s256_cr1.0_n10,0.9695,0.95,0.9928,1.0,0.9781,0.0228
+metal_nut_patchcore_wide_resnet50_2_s256_cr1.0_n5,0.9417,0.9194,0.9855,1.0,0.9617,0.0375
+metal_nut_patchcore_wide_resnet50_2_s256_cr1.0_n50,0.9972,0.975,1.0,1.0,0.9931,0.0121
+metal_nut_winclip_ViT-B-16-plus-240_s240_n0,0.9167,0.9833,0.9058,0.9924,0.9496,0.0446
+metal_nut_winclip_ViT-B-16-plus-240_s240_n1,0.9944,0.9222,0.9686,1.0,0.9713,0.0355
+metal_nut_winclip_ViT-B-16-plus-240_s240_n10,1.0,1.0,0.9855,1.0,0.9964,0.0072
+metal_nut_winclip_ViT-B-16-plus-240_s240_n5,1.0,1.0,0.9807,1.0,0.9952,0.0097
+metal_nut_yolov8s_img640_pool,1.0,1.0,1.0,0.9848,0.9962,0.0076

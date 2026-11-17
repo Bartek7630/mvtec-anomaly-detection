@@ -13,6 +13,7 @@ Good images get an empty label file, i.e. "no defect here".
 import argparse
 import random
 import shutil
+import time
 from collections import Counter
 from pathlib import Path
 
@@ -27,10 +28,12 @@ MIN_AREA = 4
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--root", required=True, help="path to one MVTec AD category folder, e.g. /content/screw")
-    p.add_argument("--folds", default="splits/screw_folds.csv", help="CSV from make_splits.py")
+    p.add_argument("--category", default=None, help="category name (default: the name of the --root folder)")
+    p.add_argument("--folds", default=None, help="CSV from make_splits.py (default: splits/<category>_folds.csv)")
     p.add_argument("--fold", type=int, required=True, help="fold used as the test set")
     p.add_argument("--out", default=None,
-                   help="output folder (default: yolo_data/fold<k>, or yolo_data/fold<k>_n<N>_seed<S> with --n-defect)")
+                   help="output folder (default: yolo_data/fold<k>, or yolo_data/fold<k>_n<N>_seed<S> with --n-defect; "
+                        "for every category except screw it is yolo_data/<category>/...)")
     p.add_argument("--preview", type=int, default=10, help="number of images with drawn boxes to save for a visual check")
     p.add_argument("--n-defect", type=int, default=None,
                    help="few-shot: use only this many defective training images (default: all defective images of the pool)")
@@ -64,6 +67,20 @@ def boxes_from_mask(mask_path: Path, image_shape):
         lines.append(f"0 {cx:.6f} {cy:.6f} {w / w_img:.6f} {h / h_img:.6f}")
         pixel_boxes.append((x, y, w, h))
     return lines, pixel_boxes
+
+
+def remove_folder(path: Path, attempts: int = 5, wait: float = 3.0) -> None:
+    """Delete a folder. On Windows a file can be locked for a while (preview, antivirus, OneDrive), so retry."""
+    for attempt in range(1, attempts + 1):
+        try:
+            shutil.rmtree(path)
+            return
+        except PermissionError as error:
+            if attempt == attempts:
+                raise SystemExit(f"Cannot delete {path} ({error}). Close programs that may use its files "
+                                 f"(Explorer preview, Photos, OneDrive sync) or delete the folder by hand, then run again.")
+            print(f"Cannot delete {path} yet (attempt {attempt}/{attempts}), waiting {wait:.0f} s ...")
+            time.sleep(wait)
 
 
 def choose_train_rows(pool: pd.DataFrame, n_defect, seed: int) -> pd.DataFrame:
@@ -119,18 +136,22 @@ def save_previews(previews, out: Path, n: int):
 def main():
     args = parse_args()
     root = Path(args.root)
+    category = args.category or root.resolve().name
     default_name = f"fold{args.fold}" if args.n_defect is None else f"fold{args.fold}_n{args.n_defect}_seed{args.seed}"
-    out = Path(args.out or f"yolo_data/{default_name}")
-    folds = pd.read_csv(args.folds)
+    prefix = "" if category == "screw" else f"{category}/"
+    out = Path(args.out or f"yolo_data/{prefix}{default_name}")
+    folds_file = args.folds or f"splits/{category}_folds.csv"
+    print(f"Category: {category}, folds: {folds_file}")
+    folds = pd.read_csv(folds_file)
     if args.fold not in set(folds["fold"]):
-        raise SystemExit(f"Fold {args.fold} not found in {args.folds}")
+        raise SystemExit(f"Fold {args.fold} not found in {folds_file}")
     test_rows = folds[folds["fold"] == args.fold]
     pool = folds[folds["fold"] != args.fold]
     train_rows = choose_train_rows(pool, args.n_defect, args.seed)
     assert set(test_rows["path"]).isdisjoint(train_rows["path"]), "train and test overlap"
 
     if out.exists():
-        shutil.rmtree(out)
+        remove_folder(out)
     previews = []
     summary = {}
     for split, rows in (("train", train_rows), ("test", test_rows)):

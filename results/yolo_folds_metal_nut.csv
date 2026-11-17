@@ -1,0 +1,5 @@
+run,imgsz,fold,n_defect,train_seed,n_images,image_AUROC,pixel_AUROC
+metal_nut_fold0_all_640,640,0,all,,29,1.0,0.9053
+metal_nut_fold1_all_640,640,1,all,,29,1.0,0.9329
+metal_nut_fold2_all_640,640,2,all,,29,1.0,0.9318
+metal_nut_fold3_all_640,640,3,all,,28,0.9848,0.905

@@ -1,14 +1,15 @@
-"""Which defect types are hard for which method?
-
+"""
 Input : scores/*.csv            one file per run (columns path, label, score), name ends with _seed<N>
-        splits/screw_folds.csv  (columns path, defect_type, label, fold)
+        splits/<category>_folds.csv  (columns path, defect_type, label, fold)
+        Only files whose name starts with "<category>_" are read. Output file names get the suffix _<category> for
+        every category except screw. If a method appears twice (e.g. PatchCore with all images and few-shot files),
+        select the files with --methods, e.g. --methods patchcore_wide_resnet50_2_s256_cr0.01_nall padim yolov8s_img640.
         --root                  MVTec AD category folder (only needed for the pictures of missed images)
 Output: results/auroc_by_defect_type.csv   AUROC "good vs one defect type" for every method
         results/recall_by_defect_type.csv  share of defective images found at a threshold that keeps 95% of good images
         results/missed_<method>.csv        the defective images with the lowest scores
         figures/auroc_by_defect_type.png   bar chart
         figures/missed_<method>.png        the most missed images with their ground-truth mask (needs --root)
-
 
 """
 
@@ -31,7 +32,8 @@ def parse_args():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--root", default=None, help="MVTec AD category folder (for the pictures of missed images)")
     p.add_argument("--scores-dir", default=str(ROOT_REPO / "scores"))
-    p.add_argument("--folds", default=str(ROOT_REPO / "splits" / "screw_folds.csv"))
+    p.add_argument("--category", default="screw", help="MVTec AD category (selects score files and folds file)")
+    p.add_argument("--folds", default=None, help="default: splits/<category>_folds.csv")
     p.add_argument("--methods", nargs="+", default=["patchcore", "padim", "stfpm", "efficientad", "yolov8s_img640"],
                    help="a score file is used if its method name contains one of these words")
     p.add_argument("--good-kept", type=float, default=0.95, help="share of good images that must stay below the threshold")
@@ -39,10 +41,10 @@ def parse_args():
     return p.parse_args()
 
 
-def load_runs(scores_dir: Path, folds: pd.DataFrame, words: list) -> pd.DataFrame:
+def load_runs(scores_dir: Path, folds: pd.DataFrame, words: list, category: str) -> pd.DataFrame:
     """Stack all chosen score files into one table: method, seed, path, label, score + defect_type, fold."""
     tables = []
-    for file in sorted(scores_dir.glob("*.csv")):
+    for file in sorted(scores_dir.glob(f"{category}_*.csv")):
         method, _, seed = file.stem.rpartition("_seed")
         if not method or not any(w in method for w in words):
             continue
@@ -181,26 +183,27 @@ def main():
     res, fig_dir = ROOT_REPO / "results", ROOT_REPO / "figures"
     res.mkdir(exist_ok=True), fig_dir.mkdir(exist_ok=True)
 
-    folds = pd.read_csv(args.folds)
+    folds_file = args.folds or str(ROOT_REPO / "splits" / f"{args.category}_folds.csv")
+    sfx = "" if args.category == "screw" else f"_{args.category}"
+    print(f"Category: {args.category}, folds: {folds_file}")
+    folds = pd.read_csv(folds_file)
     types = sorted(t for t in folds["defect_type"].unique() if t != "good")
     print("images per type:", folds["defect_type"].value_counts().to_dict())
 
-    runs = load_runs(Path(args.scores_dir), folds, args.methods)
+    runs = load_runs(Path(args.scores_dir), folds, args.methods, args.category)
     print("methods:", {m: sorted(int(s) for s in g["seed"].unique()) for m, g in runs.groupby("method")})
 
-    # 1. AUROC per defect type
     table = auroc_by_type(runs, types)
-    table.round(4).to_csv(res / "auroc_by_defect_type.csv", index=False)
+    table.round(4).to_csv(res / f"auroc_by_defect_type{sfx}.csv", index=False)
     wide = table.pivot(index="defect_type", columns="method", values="auroc").loc[types + ["ALL DEFECTS"]]
     wide.columns = [short_name(c) for c in wide.columns]
     pd.set_option("display.width", 200)
     print("\nAUROC, good vs one defect type (mean over seeds):\n", wide.round(3).to_string())
-    plot_auroc(table, types, fig_dir / "auroc_by_defect_type.png")
+    plot_auroc(table, types, fig_dir / f"auroc_by_defect_type{sfx}.png")
 
-    # 2. recall at a fixed false-alarm rate + missed images
     scores = mean_scores(runs)
     recall, missed = recall_and_missed(scores, types, args.good_kept)
-    recall.round(4).to_csv(res / "recall_by_defect_type.csv", index=False)
+    recall.round(4).to_csv(res / f"recall_by_defect_type{sfx}.csv", index=False)
     rw = recall.pivot(index="defect_type", columns="method", values="recall")
     rw.columns = [short_name(c) for c in rw.columns]
     print(f"\nShare of defective images found when {args.good_kept:.0%} of good images are kept below the threshold:\n",
@@ -208,11 +211,11 @@ def main():
 
     for method, m in missed.items():
         name = short_name(method).replace(" ", "_")
-        m[["path", "defect_type", "score", "threshold"]].to_csv(res / f"missed_{name}.csv", index=False)
+        m[["path", "defect_type", "score", "threshold"]].to_csv(res / f"missed_{name}{sfx}.csv", index=False)
         print(f"\n{short_name(method)}: {len(m)} defective images missed; lowest scores:")
         print(m[["path", "score"]].head(5).to_string(index=False))
         if args.root:
-            plot_missed(method, m, Path(args.root), args.n_missed, fig_dir / f"missed_{name}.png")
+            plot_missed(method, m, Path(args.root), args.n_missed, fig_dir / f"missed_{name}{sfx}.png")
     if not args.root:
         print("\n(no --root given: pictures of missed images were skipped)")
 

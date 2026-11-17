@@ -408,6 +408,8 @@ python analysis/anomaly_vs_supervised.py   # both curves in one figure
 python analysis/per_defect_type.py --root data/mvtec/screw   # AUROC and missed images per defect type
 ```
 
+All scripts of this section take the category from the `--root` folder name or from `--category` (default `screw`). For another category, e.g. `metal_nut`, use `--category metal_nut`, name the YOLO runs `metal_nut_fold<k>_all_<size>`, and the outputs get the category in their name (`splits/metal_nut_folds.csv`, `yolo_data/metal_nut/fold<k>`, `results/folds_summary_metal_nut.csv`). `scores/` holds files of many categories; `eval_folds.py` and `per_defect_type.py` read only the files that start with `<category>_`.
+
 The fixed training settings (`val=False`, last weights, no selection on the test folds) were chosen before looking at any result, so that the folds stay a fair test. `yolo_data/`, `runs/` and `*.pt` are not committed: they are derived from the MVTec AD images.
 
 ## Repository structure

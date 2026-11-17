@@ -18,7 +18,8 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp"}
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--root", required=True, help="path to one MVTec AD category folder, e.g. data/mvtec/screw")
-    p.add_argument("--out", default="splits/screw_folds.csv", help="output CSV file")
+    p.add_argument("--category", default=None, help="category name (default: the name of the --root folder)")
+    p.add_argument("--out", default=None, help="output CSV file (default: splits/<category>_folds.csv)")
     p.add_argument("--n-folds", type=int, default=4)
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
@@ -40,7 +41,9 @@ def list_test_images(root: Path):
 def main():
     args = parse_args()
     root = Path(args.root)
+    category = args.category or root.resolve().name
     paths, defect_types = list_test_images(root)
+    print(f"Category: {category}")
     print(f"Found {len(paths)} test images: {dict(Counter(defect_types))}")
 
     skf = StratifiedKFold(n_splits=args.n_folds, shuffle=True, random_state=args.seed)
@@ -49,7 +52,7 @@ def main():
         fold_of[test_index] = fold
     assert (fold_of >= 0).all(), "some images were not assigned to a fold"
 
-    out = Path(args.out)
+    out = Path(args.out or f"splits/{category}_folds.csv")
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
