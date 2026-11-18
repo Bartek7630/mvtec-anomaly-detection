@@ -1,11 +1,17 @@
-"""Summarise the YOLO few-shot experiment (results/yolo_fewshot.csv) and draw the learning curve.
+"""Summarise the YOLO few-shot experiment and draw the learning curve. Works for any category (--category, default screw).
 
 Input : results/yolo_fewshot.csv   (one row per training: fold, n_defect, train_seed, image/pixel AUROC)
         results/yolo_folds.csv     (the full-data YOLO runs: used as the last point of the curve)
         results/folds_summary.csv  (PatchCore per fold: used as the reference line)
-Output: results/yolo_fewshot_summary.csv, figures/yolo_fewshot_curve.png
+        For every category except screw the file names get the suffix _<category>:
+        results/yolo_fewshot_metal_nut.csv, results/yolo_folds_metal_nut.csv, results/folds_summary_metal_nut.csv
+Output: results/yolo_fewshot_summary[_<category>].csv, figures/yolo_fewshot_curve[_<category>].png
+
+    python analysis/yolo_fewshot.py
+    python analysis/yolo_fewshot.py --category metal_nut
 """
 
+import argparse
 from pathlib import Path
 
 import matplotlib
@@ -31,7 +37,13 @@ def summarise(df: pd.DataFrame, metric: str) -> pd.DataFrame:
 
 
 def main():
-    few = pd.read_csv(RES / "yolo_fewshot.csv")
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--category", default="screw")
+    category = parser.parse_args().category
+    sfx = "" if category == "screw" else f"_{category}"
+    pretty = category.replace("_", " ")
+
+    few = pd.read_csv(RES / f"yolo_fewshot{sfx}.csv")
     assert len(few) == few[["fold", "n_defect", "train_seed"]].drop_duplicates().shape[0], "duplicate runs in the CSV"
     n_runs = few.groupby("n_defect").size()
     print("runs per N:", n_runs.to_dict())
@@ -39,24 +51,31 @@ def main():
     image = summarise(few, "image_AUROC")
     pixel = summarise(few, "pixel_AUROC")
 
-    full = pd.read_csv(RES / "yolo_folds.csv")
+    full = pd.read_csv(RES / f"yolo_folds{sfx}.csv")
     full = full[full["imgsz"] == 640].sort_values("fold")
     full_img = full["image_AUROC"].to_numpy()
-    patchcore = pd.read_csv(RES / "folds_summary.csv").set_index("method").filter(like="patchcore", axis=0).iloc[0]
+    assert len(full_img) == 4, f"expected 4 full-data YOLO runs (imgsz 640), found {len(full_img)}"
+    summary = pd.read_csv(RES / f"folds_summary{sfx}.csv").set_index("method")
+    patchcore = summary[summary.index.str.contains("patchcore") & summary.index.str.contains("cr0.01_nall")].iloc[0]
     pc_mean = float(patchcore["mean"])
+    folds_file = ROOT / "splits" / f"{category}_folds.csv"
+    n_pool = None
+    if folds_file.exists():
+        f = pd.read_csv(folds_file)
+        n_pool = int(round(np.mean([((f["fold"] != k) & (f["label"] == 1)).sum() for k in sorted(f["fold"].unique())])))
+    all_tag = f"all\n(~{n_pool})" if n_pool else "all"
 
     table = image.round(4).assign(pixel_AUROC_mean=pixel["mean"].round(4))
-    table.loc["all (~90, 1 seed)"] = [round(full_img.mean(), 4), round(full_img.std(ddof=1), 4), full_img.min(), full_img.max(),
+    table.loc["all (1 seed)"] = [round(full_img.mean(), 4), round(full_img.std(ddof=1), 4), full_img.min(), full_img.max(),
                                       np.nan, *full_img, round(full["pixel_AUROC"].mean(), 4)]
     table.index.name = "n_defect"
-    table.to_csv(RES / "yolo_fewshot_summary.csv")
+    table.to_csv(RES / f"yolo_fewshot_summary{sfx}.csv")
     pd.set_option("display.width", 200)
     print(table.to_string())
 
-    # ----- figure
     ns = list(image.index)
     xs = np.arange(len(ns) + 1)
-    labels = [str(n) for n in ns] + ["all\n(~90)"]
+    labels = [str(n) for n in ns] + [all_tag]
     fig, ax = plt.subplots(figsize=(7.4, 4.6), facecolor=SURFACE)
     ax.set_facecolor(SURFACE)
     for side in ("top", "right"):
@@ -64,7 +83,6 @@ def main():
     ax.spines["left"].set_color(GRID), ax.spines["bottom"].set_color(GRID)
     ax.grid(axis="y", color=GRID, lw=0.8), ax.set_axisbelow(True)
 
-    # every single training (small dots), grouped by N
     for i, n in enumerate(ns):
         sub = few[few.n_defect == n]
         jitter = (sub["fold"].to_numpy() - 1.5) * 0.07
@@ -85,22 +103,22 @@ def main():
                 fontsize=9, color=INK)
 
     ax.axhline(pc_mean, color=REF, lw=1, ls=(0, (4, 3)))
-    ax.text(-0.35, pc_mean + 0.006, f"PatchCore, all 320 good images: {pc_mean:.3f}", ha="left", fontsize=8.5, color=INK2)
+    ax.text(-0.35, pc_mean + 0.006, f"PatchCore, all good training images: {pc_mean:.3f}", ha="left", fontsize=8.5, color=INK2)
     ax.axhline(0.5, color=REF, lw=1, ls=(0, (1, 3)))
     ax.text(xs[-1] + 0.45, 0.505, "chance = 0.5", ha="right", fontsize=8.5, color=INK2, va="bottom")
 
     ax.set_xticks(xs), ax.set_xticklabels(labels)
     ax.set_xlim(-0.45, xs[-1] + 0.5), ax.set_ylim(0.45, 1.02)
-    ax.set_xlabel("number of DEFECTIVE training images N (plus the same number of good ones, at most ~30)", fontsize=9, color=INK2)
+    ax.set_xlabel("number of DEFECTIVE training images N (plus as many good ones as the pool has)", fontsize=9, color=INK2)
     ax.set_ylabel("image AUROC", fontsize=9, color=INK2)
     ax.tick_params(colors=INK2)
-    ax.set_title("YOLOv8 on MVTec AD 'screw': how many defective images are needed?", loc="left", fontsize=11.5, color=INK, pad=34)
+    ax.set_title(f"YOLOv8 on MVTec AD '{pretty}': how many defective images are needed?", loc="left", fontsize=11.5, color=INK, pad=34)
     ax.legend(frameon=False, fontsize=8.2, loc="upper left", bbox_to_anchor=(0, 1.13), ncol=1)
     fig.text(0.01, 0.012, "Small dots: single trainings (3 seeds x 4 folds per N). About 1500 training iterations for every N.\n"
              "N means defective images for YOLO, but good images for PatchCore.", fontsize=7.6, color=INK2, va="bottom")
     fig.tight_layout(rect=[0, 0.07, 1, 1])
-    fig.savefig(FIG / "yolo_fewshot_curve.png", dpi=150, facecolor=SURFACE)
-    print("Saved", RES / "yolo_fewshot_summary.csv", "and", FIG / "yolo_fewshot_curve.png")
+    fig.savefig(FIG / f"yolo_fewshot_curve{sfx}.png", dpi=150, facecolor=SURFACE)
+    print("Saved", RES / f"yolo_fewshot_summary{sfx}.csv", "and", FIG / f"yolo_fewshot_curve{sfx}.png")
 
 
 if __name__ == "__main__":
