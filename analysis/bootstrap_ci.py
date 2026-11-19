@@ -1,5 +1,6 @@
 """95% bootstrap confidence intervals for image AUROC, and paired bootstrap differences between methods.
 
+Works only on the per-image score files in scores/ (columns: path,label,score), so no GPU and no images are needed.
 
 Usage (from the repo root):
     python analysis/bootstrap_ci.py                      # all 15 categories, B = 2000
@@ -7,11 +8,6 @@ Usage (from the repo root):
 
 Writes results/bootstrap_ci.csv and results/bootstrap_diff.csv.
 
-How it works:
-  * n test images, S seeds. For every category we draw ONE matrix of bootstrap indices idx (B, n) and use it for every
-    method. Using the same images for all methods is exactly what makes the comparison paired.
-  * For one replication b: take the images idx[b], compute AUROC for every seed, average over the seeds.
-    The average over seeds is the same quantity as in the results tables.
 """
 import argparse
 from pathlib import Path
@@ -27,8 +23,9 @@ METHODS = {
     "PaDiM": "{cat}_padim_wide_resnet50_2_s256_d200_nall_seed*.csv",
     "WinCLIP 0": "{cat}_winclip_ViT-B-16-plus-240_s240_n0_seed*.csv",
     "WinCLIP 10": "{cat}_winclip_ViT-B-16-plus-240_s240_n10_seed*.csv",
+    "EfficientAD": "{cat}_efficientad_pdn_s_s256_e244_nall_seed*.csv",
 }
-PAIRS = [("PatchCore", "PaDiM"), ("PatchCore", "WinCLIP 10"), ("WinCLIP 10", "WinCLIP 0")]
+PAIRS = [("PatchCore", "PaDiM"), ("PatchCore", "WinCLIP 10"), ("WinCLIP 10", "WinCLIP 0"), ("EfficientAD", "PatchCore")]
 CATEGORIES = ["bottle", "cable", "capsule", "carpet", "grid", "hazelnut", "leather", "metal_nut",
               "pill", "screw", "tile", "toothbrush", "transistor", "wood", "zipper"]
 
@@ -55,7 +52,7 @@ def auroc(labels, score):
     n0 = len(labels) - n1
     if n1 == 0 or n0 == 0:
         return np.nan
-    ranks = rankdata(score)  # average ranks for ties
+    ranks = rankdata(score)
     return (ranks[labels == 1].sum() - n1 * (n1 + 1) / 2) / (n1 * n0)
 
 

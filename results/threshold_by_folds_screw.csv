@@ -1,5 +1,5 @@
 method,seeds,recall,false_alarm,precision,f1_honest,f1_optimistic,recall_std,f1_gap
-screw_efficientad_pdn_s_s256_e244_nall,1,0.9328,0.0732,0.9737,0.9528,0.9614,,0.0086
+screw_efficientad_pdn_s_s256_e244_nall,3,0.8403,0.0732,0.9706,0.8989,0.9455,0.0969,0.0466
 screw_patchcore_wide_resnet50_2_s256_cr0.01_nall,3,0.7899,0.0569,0.9755,0.871,0.95,0.0969,0.0791
 screw_yolov8s_img1024_pool,1,0.6891,0.0732,0.9647,0.8039,0.9145,,0.1106
 screw_yolov8s_img640_pool,1,0.6807,0.0732,0.9643,0.798,0.9187,,0.1207

@@ -29,6 +29,7 @@ pill,WinCLIP 10,WinCLIP 0,0.4274,0.363,0.4839,True
 screw,PatchCore,PaDiM,0.1306,0.0707,0.1976,True
 screw,PatchCore,WinCLIP 10,0.114,0.0455,0.1854,True
 screw,WinCLIP 10,WinCLIP 0,0.126,0.0705,0.1802,True
+screw,EfficientAD,PatchCore,-0.008,-0.0404,0.0264,False
 tile,PatchCore,PaDiM,0.0076,0.0013,0.0179,True
 tile,PatchCore,WinCLIP 10,0.0005,0.0,0.0023,False
 tile,WinCLIP 10,WinCLIP 0,0.0002,0.0,0.0012,False
