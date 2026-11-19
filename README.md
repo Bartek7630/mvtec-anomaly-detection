@@ -85,7 +85,7 @@ How to read it: the intervals are wide when the test set is small. `toothbrush` 
 | method | runs | training images | image AUROC | pixel AUROC | training time [s] | model forward [ms/image] |
 |---|---|---|---|---|---|---|
 | PatchCore | 3 seeds | 320 | 0.960 ± 0.013 | 0.981 ± 0.001 | 37 | 12.6 |
-| PaDiM | 3 seeds | 320 | 0.829 ± 0.022 | 0.975 ± 0.001 | 38 | 4.7 |
+| PaDiM | 3 seeds | 320 | 0.829 ± 0.022 | 0.975 ± 0.001 | 38 | 12.7 |
 | STFPM | 3 seeds | 320 | 0.793 ± 0.087 | 0.946 ± 0.032 | 1243 | 10.1 |
 | EfficientAD (S) | 3 seeds | 288 | 0.952 ± 0.012 | 0.968 ± 0.006 | 7312 | 12.4 |
 | YOLOv8s, 640 px (supervised) | 4 folds | ~120 (~90 defective) | 0.908 ± 0.039 | 0.978 ± 0.008 † | - | - |
@@ -259,10 +259,27 @@ Forward pass per image (model only, no file reading), RTX 4060 Laptop GPU, fp32,
 
 | method | batch 1 [ms/image] | batch 16 [ms/image] | training time on `screw` [s] |
 |---|---|---|---|
-| PaDiM | 4.7 | 1.0 | 21-49 (mean 38) |
 | STFPM | 10.1 | 1.2 | 1240-1246 |
-| EfficientAD (S) | 12.4 | 8.8 | 7598 |
+| EfficientAD (S) | 12.4 | 8.8 | 7122-7598 |
 | PatchCore | 12.6 | 5.2 | 37-38 |
+| PaDiM (WideResNet-50) | 12.7 | 4.5 | 21-49 (mean 38) |
+
+On a GPU at batch 1 the four methods are close (10-13 ms per image): launching many small operations dominates, not the arithmetic. Batches of 16 show the real cost per image: STFPM 1.2 ms, PaDiM 4.5, PatchCore 5.2, EfficientAD 8.8.
+
+**Without a GPU.** A small factory may not have one, so the same forward pass was timed on the CPU (AMD Ryzen 7 7435HS, 8 cores / 16 threads, torch 2.14.1, batch 1, median of 30 runs after 5 warm-up runs, `python analysis/time_inference.py --device cpu --threads N`). PaDiM and PatchCore were fitted on the GPU first and then moved to the CPU, so the memory bank is the same size as in the GPU measurement.
+
+| method | CPU, 8 threads [ms/image] | images/s | CPU, 1 thread [ms/image] | images/s | GPU, batch 1 [ms/image] |
+|---|---|---|---|---|---|
+| STFPM | 35 | 28 | 146 | 6.8 | 10.1 |
+| PatchCore | 129 | 7.8 | 588 | 1.7 | 12.6 |
+| EfficientAD (S) | 215 | 4.6 | 1039 | 1.0 | 12.4 |
+| PaDiM (WideResNet-50) | 218 | 4.6 | 633 | 1.6 | 12.7 |
+
+- All four methods run without a GPU: 4.6 to 28 images per second on 8 threads, 1.0 to 6.8 on a single thread. For a line that inspects one part every few seconds, that is enough; for tens of parts per second it is not.
+- The order on the GPU does not predict the order on the CPU. STFPM is the fastest on the CPU; EfficientAD, which the paper presents as the fastest method on a GPU, is the slowest on one thread here. This is a measurement of the anomalib implementation on this processor, not a property of the method.
+- 8 threads give 3 to 5 times the speed of 1 thread, not 8 times.
+- Only the forward pass is timed (no image reading, resizing or saving), so a full inspection takes longer. Repeated runs of the same setting differ by less than 1% for 1 thread, but the CPU results depend on the processor and its power settings.
+- The CPU timing of PaDiM before 19.12 had used ResNet-18 by mistake (4.7 ms on the GPU); the numbers above are for the WideResNet-50 used in all PaDiM experiments.
 
 ## Method in short
 
@@ -441,7 +458,8 @@ results/
   efficientad_screw.csv, efficientad_fewshot.csv   # EfficientAD: full data and N = 50 (one run each)
   winclip_fewshot.csv    # WinCLIP: zero-shot and N = 1, 5, 10 (10 runs)
   ablation_screw.csv     # 30 runs: neighbours, backbone, resolution, PaDiM backbones
-  inference_time.csv     # latency measurements
+  inference_time.csv     # latency measurements on the GPU
+  inference_time_cpu.csv # latency measurements on the CPU (1 thread and 8 threads)
   summary_all_methods.csv/.md   # table of all methods on screw
   folds_summary.csv, fold_auroc_per_run.csv   # AUROC per fold for all methods
   yolo_folds.csv         # YOLO trained on all defective images of the other folds

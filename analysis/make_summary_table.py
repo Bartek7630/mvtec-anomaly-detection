@@ -9,6 +9,11 @@ Input : results/four_categories.csv   PatchCore, PaDiM (screw rows, seeds 1, 2, 
         results/inference_time.csv    forward pass per image, batch 1, median (analysis/time_inference.py)
 Output: results/summary_all_methods.csv and results/summary_all_methods.md
 
+What is NOT in the table, on purpose
+* WinCLIP: no training, so the training time is 0; its forward pass was not timed with time_inference.py (it uses 240 px and a
+  different input), so that cell is empty.
+* YOLO: no training time and no latency were measured, and its pixel AUROC is computed from boxes on a sample of pixels, so it is not
+  comparable with the anomaly maps (marked with a dagger).
 """
 
 from pathlib import Path
@@ -27,7 +32,7 @@ def main():
     four = pd.read_csv(RES / "four_categories.csv")
     four = four[four["category"] == "screw"]
     lat = pd.read_csv(RES / "inference_time.csv")
-    lat = lat[lat["batch_size"] == 1].set_index("model")["median_ms_per_image"]
+    lat = lat[lat["batch_size"] == 1].drop_duplicates("model", keep="last").set_index("model")["median_ms_per_image"]
     rows = []
 
     for key, name in (("patchcore", "PatchCore"), ("padim", "PaDiM")):

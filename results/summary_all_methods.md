@@ -1,7 +1,7 @@
 | method | runs | training images | image AUROC | pixel AUROC | training time [s] | model forward [ms/image] |
 |---|---|---|---|---|---|---|
 | PatchCore | 3 seeds | 320 | 0.960 ± 0.013 | 0.981 ± 0.001 | 37 | 12.6 |
-| PaDiM | 3 seeds | 320 | 0.829 ± 0.022 | 0.975 ± 0.001 | 38 | 4.7 |
+| PaDiM | 3 seeds | 320 | 0.829 ± 0.022 | 0.975 ± 0.001 | 38 | 12.7 |
 | STFPM | 3 seeds | 320 | 0.793 ± 0.087 | 0.946 ± 0.032 | 1243 | 10.1 |
 | EfficientAD (S) | 3 seeds | 288 | 0.952 ± 0.012 | 0.968 ± 0.006 | 7312 | 12.4 |
 | YOLOv8s, 640 px (supervised) | 4 folds | ~120 (~90 defective) | 0.908 ± 0.039 | 0.978 ± 0.008 † | - | - |

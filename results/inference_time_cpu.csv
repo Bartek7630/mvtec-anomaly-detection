@@ -1,0 +1,17 @@
+date,model,device,gpu,cpu,logical_cores,torch_threads,torch,batch_size,warmup,runs,median_ms_per_image,mean_ms_per_image,p95_ms_per_image,images_per_s,note
+2026-11-19T14:11:57,efficientad,cpu,,AMD Ryzen 7 7435HS,16,1,2.14.1+cu126,1,5,30,1045.221,1045.234,1048.473,1.0,untrained weights (speed does not depend on weights)
+2026-11-19T14:12:03,stfpm,cpu,,AMD Ryzen 7 7435HS,16,1,2.14.1+cu126,1,5,30,145.226,145.459,147.098,6.9,untrained weights (speed does not depend on weights)
+2026-11-19T14:12:25,padim,cpu,,AMD Ryzen 7 7435HS,16,1,2.14.1+cu126,1,5,30,177.766,177.592,180.171,5.6,fitted on 320 training images
+2026-11-19T14:13:20,patchcore,cpu,,AMD Ryzen 7 7435HS,16,1,2.14.1+cu126,1,5,30,591.764,591.943,595.366,1.7,fitted on 320 training images
+2026-11-19T14:16:25,efficientad,cpu,,AMD Ryzen 7 7435HS,16,1,2.14.1+cu126,1,5,30,1039.337,1039.44,1042.198,1.0,untrained weights (speed does not depend on weights)
+2026-11-19T14:16:30,stfpm,cpu,,AMD Ryzen 7 7435HS,16,1,2.14.1+cu126,1,5,30,145.993,146.03,146.841,6.8,untrained weights (speed does not depend on weights)
+2026-11-19T14:16:52,padim,cpu,,AMD Ryzen 7 7435HS,16,1,2.14.1+cu126,1,5,30,176.604,176.613,179.56,5.7,fitted on 320 training images
+2026-11-19T14:17:47,patchcore,cpu,,AMD Ryzen 7 7435HS,16,1,2.14.1+cu126,1,5,30,588.377,589.116,592.36,1.7,fitted on 320 training images
+2026-11-19T14:21:28,efficientad,cpu,,AMD Ryzen 7 7435HS,16,8,2.14.1+cu126,1,5,30,215.475,216.597,245.326,4.6,untrained weights (speed does not depend on weights)
+2026-11-19T14:21:31,stfpm,cpu,,AMD Ryzen 7 7435HS,16,8,2.14.1+cu126,1,5,30,35.448,35.672,41.364,28.2,untrained weights (speed does not depend on weights)
+2026-11-19T14:21:46,padim,cpu,,AMD Ryzen 7 7435HS,16,8,2.14.1+cu126,1,5,30,70.861,70.52,74.171,14.1,fitted on 320 training images
+2026-11-19T14:22:29,patchcore,cpu,,AMD Ryzen 7 7435HS,16,8,2.14.1+cu126,1,5,30,128.783,128.988,147.524,7.8,fitted on 320 training images
+2026-11-19T14:27:00,padim,cpu,,AMD Ryzen 7 7435HS,16,8,2.14.1+cu126,1,5,30,72.521,74.102,82.583,13.8,fitted on 320 training images
+2026-11-19T14:27:39,padim,cpu,,AMD Ryzen 7 7435HS,16,1,2.14.1+cu126,1,5,30,175.245,176.882,178.505,5.7,fitted on 320 training images
+2026-11-19T14:31:46,padim,cpu,,AMD Ryzen 7 7435HS,16,8,2.14.1+cu126,1,5,30,217.652,216.396,236.397,4.6,fitted on 320 training images
+2026-11-19T14:32:58,padim,cpu,,AMD Ryzen 7 7435HS,16,1,2.14.1+cu126,1,5,30,633.259,632.525,638.549,1.6,fitted on 320 training images
