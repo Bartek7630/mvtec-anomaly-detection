@@ -1,4 +1,5 @@
-"""
+"""Which defect types are hard for which method?
+
 Input : scores/*.csv            one file per run (columns path, label, score), name ends with _seed<N>
         splits/<category>_folds.csv  (columns path, defect_type, label, fold)
         Only files whose name starts with "<category>_" are read. Output file names get the suffix _<category> for
@@ -10,6 +11,10 @@ Output: results/auroc_by_defect_type.csv   AUROC "good vs one defect type" for e
         results/missed_<method>.csv        the defective images with the lowest scores
         figures/auroc_by_defect_type.png   bar chart
         figures/missed_<method>.png        the most missed images with their ground-truth mask (needs --root)
+
+--fold-threshold   the recall is counted like in threshold_by_folds.py: the threshold of a fold is the 95th percentile of the
+                   good images of the OTHER folds, and an image is found if score >= threshold. The recall file then gets the name
+                   recall_by_defect_type_folds[_<category>].csv, so the earlier files are not overwritten.
 
 """
 
@@ -25,7 +30,7 @@ from sklearn.metrics import roc_auc_score
 
 ROOT_REPO = Path(__file__).resolve().parents[1]
 SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e6e5e1"
-COLORS = {"patchcore": "#d9822b", "yolo": "#2a78d6", "padim": "#8a8984", "stfpm": "#2a9d8f", "efficientad": "#a23b72"}
+COLORS = {"patchcore": "#d9822b", "yolo": "#2a78d6", "padim": "#8a8984", "stfpm": "#2a9d8f", "efficientad": "#a23b72", "winclip": "#6f42c1"}
 
 
 def parse_args():
@@ -38,6 +43,8 @@ def parse_args():
                    help="a score file is used if its method name contains one of these words")
     p.add_argument("--good-kept", type=float, default=0.95, help="share of good images that must stay below the threshold")
     p.add_argument("--n-missed", type=int, default=2, help="how many most-missed images to draw per method")
+    p.add_argument("--fold-threshold", action="store_true",
+                   help="threshold of a fold from the good images of the other folds (like threshold_by_folds.py), found if score >= threshold")
     return p.parse_args()
 
 
@@ -70,6 +77,8 @@ def short_name(method: str) -> str:
         return "stfpm"
     if "efficientad" in method:
         return "efficientad"
+    if "winclip" in method:
+        return "winclip " + method.rpartition("_n")[2].split("_")[0] + " ref"
     if "yolo" in method:
         return "yolo " + method.split("_img")[-1].split("_")[0] + " px"
     return method
@@ -99,23 +108,31 @@ def auroc_by_type(runs: pd.DataFrame, types: list) -> pd.DataFrame:
 
 def mean_scores(runs: pd.DataFrame) -> pd.DataFrame:
     """One score per image and method: the mean over seeds (for a single seed it is that seed)."""
-    return runs.groupby(["method", "path", "defect_type", "label"], as_index=False)["score"].mean()
+    return runs.groupby(["method", "path", "defect_type", "label", "fold"], as_index=False)["score"].mean()
 
 
-def recall_and_missed(scores: pd.DataFrame, types: list, good_kept: float):
+def recall_and_missed(scores: pd.DataFrame, types: list, good_kept: float, by_fold: bool = False):
     """Threshold = the score below which `good_kept` of the good images lie; a defective image with a score
-    at or below it is MISSED. Returns recall per defect type and the list of missed images."""
+    at or below it is MISSED. Returns recall per defect type (and for all defects) and the list of missed images.
+    by_fold=False: one threshold from all good images (optimistic). by_fold=True: the threshold of a fold comes from the good
+    images of the other folds only, and an image is found if score >= threshold (as in threshold_by_folds.py)."""
     recall_rows, missed = [], {}
     for method, m in scores.groupby("method"):
-        good = m[m["defect_type"] == "good"]["score"].to_numpy()
-        thr = float(np.quantile(good, good_kept))
         bad = m[m["label"] == 1].copy()
-        bad["found"] = bad["score"] > thr
-        for t in types:
-            sub = bad[bad["defect_type"] == t]
+        if by_fold:
+            good = m[m["defect_type"] == "good"]
+            thr_of = {k: float(np.percentile(good.loc[good["fold"] != k, "score"], 100 * good_kept)) for k in sorted(m["fold"].unique())}
+            bad["threshold"] = bad["fold"].map(thr_of)
+            bad["found"] = bad["score"] >= bad["threshold"]
+        else:
+            thr = float(np.quantile(m[m["defect_type"] == "good"]["score"].to_numpy(), good_kept))
+            bad["threshold"] = thr
+            bad["found"] = bad["score"] > thr
+        for t in types + ["ALL DEFECTS"]:
+            sub = bad if t == "ALL DEFECTS" else bad[bad["defect_type"] == t]
             recall_rows.append({"method": method, "defect_type": t, "n_defective": len(sub),
-                                "found": int(sub["found"].sum()), "recall": sub["found"].mean(), "threshold": thr})
-        missed[method] = bad[~bad["found"]].sort_values(["score", "path"]).assign(threshold=thr)
+                                "found": int(sub["found"].sum()), "recall": sub["found"].mean(), "threshold": sub["threshold"].mean()})
+        missed[method] = bad[~bad["found"]].sort_values(["score", "path"])
     return pd.DataFrame(recall_rows), missed
 
 
@@ -202,20 +219,22 @@ def main():
     plot_auroc(table, types, fig_dir / f"auroc_by_defect_type{sfx}.png")
 
     scores = mean_scores(runs)
-    recall, missed = recall_and_missed(scores, types, args.good_kept)
-    recall.round(4).to_csv(res / f"recall_by_defect_type{sfx}.csv", index=False)
-    rw = recall.pivot(index="defect_type", columns="method", values="recall")
+    recall, missed = recall_and_missed(scores, types, args.good_kept, by_fold=args.fold_threshold)
+    rec_name = f"recall_by_defect_type_folds{sfx}.csv" if args.fold_threshold else f"recall_by_defect_type{sfx}.csv"
+    recall.round(4).to_csv(res / rec_name, index=False)
+    rw = recall.pivot(index="defect_type", columns="method", values="recall").loc[types + ["ALL DEFECTS"]]
     rw.columns = [short_name(c) for c in rw.columns]
     print(f"\nShare of defective images found when {args.good_kept:.0%} of good images are kept below the threshold:\n",
           rw.round(2).to_string())
 
     for method, m in missed.items():
         name = short_name(method).replace(" ", "_")
-        m[["path", "defect_type", "score", "threshold"]].to_csv(res / f"missed_{name}{sfx}.csv", index=False)
+        m[["path", "defect_type", "score", "threshold"]].to_csv(
+            res / f"missed_{name}{'_folds' if args.fold_threshold else ''}{sfx}.csv", index=False)
         print(f"\n{short_name(method)}: {len(m)} defective images missed; lowest scores:")
         print(m[["path", "score"]].head(5).to_string(index=False))
         if args.root:
-            plot_missed(method, m, Path(args.root), args.n_missed, fig_dir / f"missed_{name}{sfx}.png")
+            plot_missed(method, m, Path(args.root), args.n_missed, fig_dir / f"missed_{name}{'_folds' if args.fold_threshold else ''}{sfx}.png")
     if not args.root:
         print("\n(no --root given: pictures of missed images were skipped)")
 

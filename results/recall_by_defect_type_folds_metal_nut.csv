@@ -1,0 +1,21 @@
+method,defect_type,n_defective,found,recall,threshold
+metal_nut_padim_wide_resnet50_2_s256_d200_nall,bent,25,22,0.88,0.635
+metal_nut_padim_wide_resnet50_2_s256_d200_nall,color,22,14,0.6364,0.6293
+metal_nut_padim_wide_resnet50_2_s256_d200_nall,flip,23,23,1.0,0.6353
+metal_nut_padim_wide_resnet50_2_s256_d200_nall,scratch,23,15,0.6522,0.6313
+metal_nut_padim_wide_resnet50_2_s256_d200_nall,ALL DEFECTS,93,74,0.7957,0.6328
+metal_nut_patchcore_wide_resnet50_2_s256_cr0.01_nall,bent,25,25,1.0,0.4406
+metal_nut_patchcore_wide_resnet50_2_s256_cr0.01_nall,color,22,22,1.0,0.4384
+metal_nut_patchcore_wide_resnet50_2_s256_cr0.01_nall,flip,23,23,1.0,0.441
+metal_nut_patchcore_wide_resnet50_2_s256_cr0.01_nall,scratch,23,23,1.0,0.4391
+metal_nut_patchcore_wide_resnet50_2_s256_cr0.01_nall,ALL DEFECTS,93,93,1.0,0.4398
+metal_nut_winclip_ViT-B-16-plus-240_s240_n10,bent,25,24,0.96,0.4601
+metal_nut_winclip_ViT-B-16-plus-240_s240_n10,color,22,22,1.0,0.4594
+metal_nut_winclip_ViT-B-16-plus-240_s240_n10,flip,23,23,1.0,0.4601
+metal_nut_winclip_ViT-B-16-plus-240_s240_n10,scratch,23,23,1.0,0.4596
+metal_nut_winclip_ViT-B-16-plus-240_s240_n10,ALL DEFECTS,93,92,0.9892,0.4598
+metal_nut_yolov8s_img640_pool,bent,25,23,0.92,0.057
+metal_nut_yolov8s_img640_pool,color,22,22,1.0,0.0588
+metal_nut_yolov8s_img640_pool,flip,23,23,1.0,0.0569
+metal_nut_yolov8s_img640_pool,scratch,23,23,1.0,0.0582
+metal_nut_yolov8s_img640_pool,ALL DEFECTS,93,91,0.9785,0.0577

@@ -1,0 +1,25 @@
+method,defect_type,n_defective,found,recall,threshold
+screw_padim_wide_resnet50_2_s256_d200_nall,manipulated_front,24,20,0.8333,0.6263
+screw_padim_wide_resnet50_2_s256_d200_nall,scratch_head,24,16,0.6667,0.6263
+screw_padim_wide_resnet50_2_s256_d200_nall,scratch_neck,25,20,0.8,0.626
+screw_padim_wide_resnet50_2_s256_d200_nall,thread_side,23,6,0.2609,0.6267
+screw_padim_wide_resnet50_2_s256_d200_nall,thread_top,23,8,0.3478,0.6253
+screw_padim_wide_resnet50_2_s256_d200_nall,ALL DEFECTS,119,70,0.5882,0.6261
+screw_patchcore_wide_resnet50_2_s256_cr0.01_nall,manipulated_front,24,16,0.6667,0.5942
+screw_patchcore_wide_resnet50_2_s256_cr0.01_nall,scratch_head,24,21,0.875,0.5942
+screw_patchcore_wide_resnet50_2_s256_cr0.01_nall,scratch_neck,25,23,0.92,0.5934
+screw_patchcore_wide_resnet50_2_s256_cr0.01_nall,thread_side,23,16,0.6957,0.5951
+screw_patchcore_wide_resnet50_2_s256_cr0.01_nall,thread_top,23,21,0.913,0.5933
+screw_patchcore_wide_resnet50_2_s256_cr0.01_nall,ALL DEFECTS,119,97,0.8151,0.594
+screw_winclip_ViT-B-16-plus-240_s240_n10,manipulated_front,24,5,0.2083,0.7584
+screw_winclip_ViT-B-16-plus-240_s240_n10,scratch_head,24,13,0.5417,0.7584
+screw_winclip_ViT-B-16-plus-240_s240_n10,scratch_neck,25,21,0.84,0.7592
+screw_winclip_ViT-B-16-plus-240_s240_n10,thread_side,23,9,0.3913,0.7576
+screw_winclip_ViT-B-16-plus-240_s240_n10,thread_top,23,17,0.7391,0.7583
+screw_winclip_ViT-B-16-plus-240_s240_n10,ALL DEFECTS,119,65,0.5462,0.7584
+screw_yolov8s_img640_pool,manipulated_front,24,6,0.25,0.2455
+screw_yolov8s_img640_pool,scratch_head,24,23,0.9583,0.2455
+screw_yolov8s_img640_pool,scratch_neck,25,23,0.92,0.2465
+screw_yolov8s_img640_pool,thread_side,23,9,0.3913,0.2445
+screw_yolov8s_img640_pool,thread_top,23,20,0.8696,0.2444
+screw_yolov8s_img640_pool,ALL DEFECTS,119,81,0.6807,0.2453

@@ -1,0 +1,21 @@
+method,defect_type,n_defective,auroc,std_seeds,n_seeds
+metal_nut_padim_wide_resnet50_2_s256_d200_nall,ALL DEFECTS,93,0.9516,0.0287,3
+metal_nut_padim_wide_resnet50_2_s256_d200_nall,bent,25,0.9612,0.0305,3
+metal_nut_padim_wide_resnet50_2_s256_d200_nall,color,22,0.9187,0.0431,3
+metal_nut_padim_wide_resnet50_2_s256_d200_nall,flip,23,0.9914,0.0116,3
+metal_nut_padim_wide_resnet50_2_s256_d200_nall,scratch,23,0.9328,0.0363,3
+metal_nut_patchcore_wide_resnet50_2_s256_cr0.01_nall,ALL DEFECTS,93,0.9992,0.0003,3
+metal_nut_patchcore_wide_resnet50_2_s256_cr0.01_nall,bent,25,0.9994,0.001,3
+metal_nut_patchcore_wide_resnet50_2_s256_cr0.01_nall,color,22,0.9979,0.0021,3
+metal_nut_patchcore_wide_resnet50_2_s256_cr0.01_nall,flip,23,1.0,0.0,3
+metal_nut_patchcore_wide_resnet50_2_s256_cr0.01_nall,scratch,23,0.9993,0.0011,3
+metal_nut_winclip_ViT-B-16-plus-240_s240_n10,ALL DEFECTS,93,0.9967,0.0011,3
+metal_nut_winclip_ViT-B-16-plus-240_s240_n10,bent,25,0.9885,0.0052,3
+metal_nut_winclip_ViT-B-16-plus-240_s240_n10,color,22,1.0,0.0,3
+metal_nut_winclip_ViT-B-16-plus-240_s240_n10,flip,23,1.0,0.0,3
+metal_nut_winclip_ViT-B-16-plus-240_s240_n10,scratch,23,0.9993,0.0011,3
+metal_nut_yolov8s_img640_pool,ALL DEFECTS,93,0.9966,,1
+metal_nut_yolov8s_img640_pool,bent,25,0.9873,,1
+metal_nut_yolov8s_img640_pool,color,22,1.0,,1
+metal_nut_yolov8s_img640_pool,flip,23,1.0,,1
+metal_nut_yolov8s_img640_pool,scratch,23,1.0,,1

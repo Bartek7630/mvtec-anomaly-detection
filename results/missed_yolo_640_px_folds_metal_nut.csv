@@ -1,0 +1,3 @@
+path,defect_type,score,threshold
+test/bent/015.png,bent,0.031219,0.0424255
+test/bent/016.png,bent,0.047089,0.071697
